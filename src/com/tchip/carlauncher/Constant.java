@@ -267,7 +267,7 @@ public interface Constant {
 
 	public static final class Module {
 		/** 是否是公版软件 */
-		public static final boolean isPublic = false;
+		public static final boolean isPublic = true;
 
 		/** 双录是否录制到单卡 */
 		public static final boolean isRecordSingleCard = true;
@@ -282,7 +282,10 @@ public interface Constant {
 		public static final boolean hasCloudCenter = !isPublic;
 
 		/** 是否有微密 */
-		public static final boolean hasWeme = isPublic;
+		public static final boolean hasWeme = false;//isPublic;
+		
+		/** 是否有翼卡在线*/
+		public static final boolean hasECarOnline = isPublic;
 
 		/** 是否有网络电台 */
 		public static final boolean hasOnlineFM = isPublic;

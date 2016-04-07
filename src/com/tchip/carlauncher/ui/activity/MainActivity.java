@@ -813,13 +813,14 @@ public class MainActivity extends Activity implements TachographCallback,
 
 	/** 初始化布局 */
 	private void initialLayout() {
+		MyOnClickListener myOnClickListener = new MyOnClickListener();
 		initialCameraSurface(); // 录像窗口
 		textRecordTime = (TextView) findViewById(R.id.textRecordTime);
 		textRecordTime.setTypeface(Typefaces.get(this, Constant.Path.FONT
 				+ "Font-Quartz-Regular.ttf"));
 		// 时钟和状态图标
 		RelativeLayout layoutWeather = (RelativeLayout) findViewById(R.id.layoutWeather);
-		layoutWeather.setOnClickListener(new MyOnClickListener());
+		layoutWeather.setOnClickListener(myOnClickListener);
 		TextClock textClock = (TextClock) findViewById(R.id.textClock);
 		textClock.setTypeface(Typefaces.get(this, Constant.Path.FONT
 				+ "Font-Helvetica-Neue-LT-Pro.otf"));
@@ -833,7 +834,7 @@ public class MainActivity extends Activity implements TachographCallback,
 				+ "Font-Helvetica-Neue-LT-Pro.otf"));
 
 		LinearLayout layoutWiFi = (LinearLayout) findViewById(R.id.layoutWiFi);
-		layoutWiFi.setOnClickListener(new MyOnClickListener());
+		layoutWiFi.setOnClickListener(myOnClickListener);
 
 		// WiFi状态信息
 		imageWifiLevel = (ImageView) findViewById(R.id.imageWifiLevel);
@@ -854,51 +855,58 @@ public class MainActivity extends Activity implements TachographCallback,
 
 		// 导航
 		ImageView imageNavi = (ImageView) findViewById(R.id.imageNavi);
-		imageNavi.setOnClickListener(new MyOnClickListener());
+		imageNavi.setOnClickListener(myOnClickListener);
 
 		// 在线音乐
 		ImageView imageMusicOL = (ImageView) findViewById(R.id.imageMusicOL);
-		imageMusicOL.setOnClickListener(new MyOnClickListener());
+		imageMusicOL.setOnClickListener(myOnClickListener);
 
 		// 电子狗
 		ImageView imageEDog = (ImageView) findViewById(R.id.imageEDog);
-		imageEDog.setOnClickListener(new MyOnClickListener());
+		imageEDog.setOnClickListener(myOnClickListener);
 
 		// 网络电台：喜马拉雅
 		RelativeLayout layoutXimalaya = (RelativeLayout) findViewById(R.id.layoutXimalaya);
 		layoutXimalaya.setVisibility(Constant.Module.hasOnlineFM ? View.VISIBLE
 				: View.GONE);
 		ImageView imageXimalaya = (ImageView) findViewById(R.id.imageXimalaya);
-		imageXimalaya.setOnClickListener(new MyOnClickListener());
+		imageXimalaya.setOnClickListener(myOnClickListener);
 
 		// 多媒体
 		ImageView imageMultimedia = (ImageView) findViewById(R.id.imageMultimedia);
-		imageMultimedia.setOnClickListener(new MyOnClickListener());
+		imageMultimedia.setOnClickListener(myOnClickListener);
 
 		// 文件管理
 		ImageView imageFileExplore = (ImageView) findViewById(R.id.imageFileExplore);
-		imageFileExplore.setOnClickListener(new MyOnClickListener());
+		imageFileExplore.setOnClickListener(myOnClickListener);
 
 		// FM发射
 		ImageView imageFmTransmit = (ImageView) findViewById(R.id.imageFmTransmit);
-		imageFmTransmit.setOnClickListener(new MyOnClickListener());
+		imageFmTransmit.setOnClickListener(myOnClickListener);
 
 		// 拨号
 		ImageView imageDialer = (ImageView) findViewById(R.id.imageDialer);
-		imageDialer.setOnClickListener(new MyOnClickListener());
+		imageDialer.setOnClickListener(myOnClickListener);
 
 		// 微信助手
 		RelativeLayout layoutWechat = (RelativeLayout) findViewById(R.id.layoutWechat);
 		layoutWechat.setVisibility(Constant.Module.hasWechat ? View.VISIBLE
 				: View.GONE);
 		ImageView imageWechat = (ImageView) findViewById(R.id.imageWechat);
-		imageWechat.setOnClickListener(new MyOnClickListener());
+		imageWechat.setOnClickListener(myOnClickListener);
 
 		// 微密
 		RelativeLayout layoutWeme = (RelativeLayout) findViewById(R.id.layoutWeme);
 		layoutWeme.setVisibility(Module.hasWeme ? View.VISIBLE : View.GONE);
 		ImageView imageWeme = (ImageView) findViewById(R.id.imageWeme);
-		imageWeme.setOnClickListener(new MyOnClickListener());
+		imageWeme.setOnClickListener(myOnClickListener);
+
+		// 翼卡在线
+		RelativeLayout layoutECarOnline = (RelativeLayout) findViewById(R.id.layoutECarOnline);
+		layoutECarOnline.setVisibility(Module.hasECarOnline ? View.VISIBLE
+				: View.GONE);
+		ImageView imageECarOnline = (ImageView) findViewById(R.id.imageECarOnline);
+		imageECarOnline.setOnClickListener(myOnClickListener);
 
 		// 云中心
 		RelativeLayout layoutCloudCenter = (RelativeLayout) findViewById(R.id.layoutCloudCenter);
@@ -906,7 +914,7 @@ public class MainActivity extends Activity implements TachographCallback,
 				.setVisibility(Constant.Module.hasCloudCenter ? View.VISIBLE
 						: View.GONE);
 		ImageView imageCloudCenter = (ImageView) findViewById(R.id.imageCloudCenter);
-		imageCloudCenter.setOnClickListener(new MyOnClickListener());
+		imageCloudCenter.setOnClickListener(myOnClickListener);
 
 		// 云中心-一键接人
 		RelativeLayout layoutCloudPick = (RelativeLayout) findViewById(R.id.layoutCloudPick);
@@ -914,7 +922,7 @@ public class MainActivity extends Activity implements TachographCallback,
 				.setVisibility(Constant.Module.hasCloudCenter ? View.VISIBLE
 						: View.GONE);
 		ImageView imageCloudPick = (ImageView) findViewById(R.id.imageCloudPick);
-		imageCloudPick.setOnClickListener(new MyOnClickListener());
+		imageCloudPick.setOnClickListener(myOnClickListener);
 
 		// 云中心-云电话
 		RelativeLayout layoutCloudDialer = (RelativeLayout) findViewById(R.id.layoutCloudDialer);
@@ -922,7 +930,7 @@ public class MainActivity extends Activity implements TachographCallback,
 				.setVisibility(Constant.Module.hasCloudCenter ? View.VISIBLE
 						: View.GONE);
 		ImageView imageCloudDialer = (ImageView) findViewById(R.id.imageCloudDialer);
-		imageCloudDialer.setOnClickListener(new MyOnClickListener());
+		imageCloudDialer.setOnClickListener(myOnClickListener);
 
 		hsvMain = (MyScrollView) findViewById(R.id.hsvMain);
 		hsvMain.setDrawingCacheEnabled(true);
@@ -948,64 +956,64 @@ public class MainActivity extends Activity implements TachographCallback,
 
 		// 录制
 		smallVideoRecord = (ImageView) findViewById(R.id.smallVideoRecord);
-		smallVideoRecord.setOnClickListener(new MyOnClickListener());
+		smallVideoRecord.setOnClickListener(myOnClickListener);
 		largeVideoRecord = (ImageView) findViewById(R.id.largeVideoRecord);
-		largeVideoRecord.setOnClickListener(new MyOnClickListener());
+		largeVideoRecord.setOnClickListener(myOnClickListener);
 		layoutVideoRecordSmall = (LinearLayout) findViewById(R.id.layoutVideoRecordSmall);
-		layoutVideoRecordSmall.setOnClickListener(new MyOnClickListener());
+		layoutVideoRecordSmall.setOnClickListener(myOnClickListener);
 		layoutVideoRecord = (LinearLayout) findViewById(R.id.layoutVideoRecord);
-		layoutVideoRecord.setOnClickListener(new MyOnClickListener());
+		layoutVideoRecord.setOnClickListener(myOnClickListener);
 
 		// 锁定
 		smallVideoLock = (ImageView) findViewById(R.id.smallVideoLock);
-		smallVideoLock.setOnClickListener(new MyOnClickListener());
+		smallVideoLock.setOnClickListener(myOnClickListener);
 		largeVideoLock = (ImageView) findViewById(R.id.largeVideoLock);
-		largeVideoLock.setOnClickListener(new MyOnClickListener());
+		largeVideoLock.setOnClickListener(myOnClickListener);
 		layoutVideoLock = (LinearLayout) findViewById(R.id.layoutVideoLock);
-		layoutVideoLock.setOnClickListener(new MyOnClickListener());
+		layoutVideoLock.setOnClickListener(myOnClickListener);
 		layoutVideoLockSmall = (LinearLayout) findViewById(R.id.layoutVideoLockSmall);
-		layoutVideoLockSmall.setOnClickListener(new MyOnClickListener());
+		layoutVideoLockSmall.setOnClickListener(myOnClickListener);
 
 		// 拍照/前后切换图标
 		smallVideoCamera = (ImageView) findViewById(R.id.smallVideoCamera);
-		smallVideoCamera.setOnClickListener(new MyOnClickListener());
+		smallVideoCamera.setOnClickListener(myOnClickListener);
 		largeVideoCamera = (ImageView) findViewById(R.id.largeVideoCamera);
 		layoutVideoCameraSmall = (LinearLayout) findViewById(R.id.layoutVideoCameraSmall);
-		layoutVideoCameraSmall.setOnClickListener(new MyOnClickListener());
+		layoutVideoCameraSmall.setOnClickListener(myOnClickListener);
 		layoutVideoCamera = (LinearLayout) findViewById(R.id.layoutVideoCamera);
 		layoutCameraSwitch = (LinearLayout) findViewById(R.id.layoutCameraSwitch);
 		imageCameraSwitch = (ImageView) findViewById(R.id.imageCameraSwitch);
 		if (Constant.Module.hasCameraSwitch) {
 			layoutVideoCamera.setVisibility(View.VISIBLE);
-			layoutVideoCamera.setOnClickListener(new MyOnClickListener());
+			layoutVideoCamera.setOnClickListener(myOnClickListener);
 
 			layoutCameraSwitch.setVisibility(View.VISIBLE);
-			layoutCameraSwitch.setOnClickListener(new MyOnClickListener());
-			imageCameraSwitch.setOnClickListener(new MyOnClickListener());
+			layoutCameraSwitch.setOnClickListener(myOnClickListener);
+			imageCameraSwitch.setOnClickListener(myOnClickListener);
 		} else {
 			layoutVideoCamera.setVisibility(View.VISIBLE);
-			layoutVideoCamera.setOnClickListener(new MyOnClickListener());
-			largeVideoCamera.setOnClickListener(new MyOnClickListener());
+			layoutVideoCamera.setOnClickListener(myOnClickListener);
+			largeVideoCamera.setOnClickListener(myOnClickListener);
 			layoutCameraSwitch.setVisibility(View.GONE);
 		}
 
 		// 视频尺寸
 		largeVideoSize = (ImageView) findViewById(R.id.largeVideoSize);
-		largeVideoSize.setOnClickListener(new MyOnClickListener());
+		largeVideoSize.setOnClickListener(myOnClickListener);
 		layoutVideoSize = (LinearLayout) findViewById(R.id.layoutVideoSize);
-		layoutVideoSize.setOnClickListener(new MyOnClickListener());
+		layoutVideoSize.setOnClickListener(myOnClickListener);
 
 		// 视频分段长度
 		largeVideoTime = (ImageView) findViewById(R.id.largeVideoTime);
-		largeVideoTime.setOnClickListener(new MyOnClickListener());
+		largeVideoTime.setOnClickListener(myOnClickListener);
 		layoutVideoTime = (LinearLayout) findViewById(R.id.layoutVideoTime);
-		layoutVideoTime.setOnClickListener(new MyOnClickListener());
+		layoutVideoTime.setOnClickListener(myOnClickListener);
 
 		// 静音
 		largeVideoMute = (ImageView) findViewById(R.id.largeVideoMute);
-		largeVideoMute.setOnClickListener(new MyOnClickListener());
+		largeVideoMute.setOnClickListener(myOnClickListener);
 		layoutVideoMute = (LinearLayout) findViewById(R.id.layoutVideoMute);
-		layoutVideoMute.setOnClickListener(new MyOnClickListener());
+		layoutVideoMute.setOnClickListener(myOnClickListener);
 
 		updateButtonState(isSurfaceLarge);
 	}
@@ -1524,6 +1532,10 @@ public class MainActivity extends Activity implements TachographCallback,
 
 			case R.id.imageWeme:
 				OpenUtil.openModule(MainActivity.this, MODULE_TYPE.WEME);
+				break;
+
+			case R.id.imageECarOnline:
+				OpenUtil.openModule(MainActivity.this, MODULE_TYPE.ECAR_OL);
 				break;
 
 			case R.id.imageWechat:

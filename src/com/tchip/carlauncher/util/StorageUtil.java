@@ -176,7 +176,7 @@ public class StorageUtil {
 
 		float backUse = (float) FileUtil.getTotalSizeOfFilesInDir(new File(
 				Constant.Path.RECORD_BACK)); // 后置已用空间
-		float frontTotal = (sdFree + frontUse + backUse) * 2 / 3; // 前置归属空间
+		float frontTotal = (sdFree + frontUse + backUse) * 4 / 5; // 前置归属空间
 		float frontFree = frontTotal - frontUse; // 前置剩余空间
 		int intFrontFree = (int) frontFree;
 		MyLog.v("[isStroageLess]sdFree:" + sdFree + "\nfrontUse:" + frontUse
@@ -204,6 +204,7 @@ public class StorageUtil {
 
 		if (!StorageUtil.isVideoCardExists()) {
 			MyLog.e("[Storageutil]deleteOldestUnlockVideo:No Video Card");
+			MyApp.shouldRecordNow = false;
 			return false;
 		}
 		try {
@@ -237,6 +238,7 @@ public class StorageUtil {
 					if (oldestVideoId == -1) {
 						if (Constant.Module.isRecordSingleCard ? isStorageLessSingle()
 								: isStorageLessDouble()) { // 此时若空间依然不足,提示用户清理存储（已不是行车视频的原因）
+
 							MyLog.e("[StorageUtil]Storage is full...");
 
 							String strNoStorage = context
@@ -246,6 +248,8 @@ public class StorageUtil {
 
 							audioRecordDialog.showErrorDialog(strNoStorage);
 							HintUtil.speakVoice(context, strNoStorage);
+							
+							MyApp.shouldRecordNow = false;
 							return false;
 						}
 					} else {

@@ -28,6 +28,9 @@ public class OpenUtil {
 		/** 拨号 */
 		DIALER,
 
+		/** 翼卡在线 */
+		ECAR_OL,
+
 		/** 电子狗 */
 		EDOG,
 
@@ -193,13 +196,10 @@ public class OpenUtil {
 							R.anim.zms_translate_up_in);
 					break;
 
-				case ENGINEER_MODE:
-					Intent intentEngineerMode = new Intent(Intent.ACTION_VIEW);
-					intentEngineerMode.setClassName(
-							"com.mediatek.engineermode",
-							"com.mediatek.engineermode.EngineerMode");
-					intentEngineerMode.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-					activity.startActivity(intentEngineerMode);
+				case ECAR_OL:
+					Intent tmpIntent = new Intent("com.android.ecar.recv");
+					tmpIntent.putExtra("ecarSendKey", "StartECar");
+					activity.sendBroadcast(tmpIntent);
 					break;
 
 				case EDOG:
@@ -215,6 +215,15 @@ public class OpenUtil {
 					activity.overridePendingTransition(
 							R.anim.zms_translate_up_out,
 							R.anim.zms_translate_up_in);
+					break;
+
+				case ENGINEER_MODE:
+					Intent intentEngineerMode = new Intent(Intent.ACTION_VIEW);
+					intentEngineerMode.setClassName(
+							"com.mediatek.engineermode",
+							"com.mediatek.engineermode.EngineerMode");
+					intentEngineerMode.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+					activity.startActivity(intentEngineerMode);
 					break;
 
 				case FILE_EXPLORER:
