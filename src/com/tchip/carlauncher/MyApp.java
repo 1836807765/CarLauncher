@@ -61,6 +61,9 @@ public class MyApp extends Application {
 
 	/** 是否正在录像 */
 	public static boolean isVideoReording = false;
+	
+	/** 更新录像时间线程是否正在运行 */
+	public static boolean isUpdateTimeThreadRun = false;
 
 	/** 当前视频片段是否加锁 */
 	public static boolean isVideoLock = false;

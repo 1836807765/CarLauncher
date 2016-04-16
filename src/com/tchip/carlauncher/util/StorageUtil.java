@@ -248,7 +248,7 @@ public class StorageUtil {
 
 							audioRecordDialog.showErrorDialog(strNoStorage);
 							HintUtil.speakVoice(context, strNoStorage);
-							
+
 							MyApp.shouldRecordNow = false;
 							return false;
 						}

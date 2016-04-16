@@ -6,10 +6,10 @@ import android.os.Environment;
 
 public interface Constant {
 	/** Debug：打印Log */
-	public static final boolean isDebug = true;
+	public static final boolean isDebug = false;
 
 	/** 日志Tag */
-	public static final String TAG = "ZMS";
+	public static final String TAG = "AZ";
 
 	/** SharedPreferences */
 	public static final class MySP {
@@ -182,7 +182,7 @@ public interface Constant {
 		 * 
 		 * MTK:17000 * 1000
 		 */
-		public static final int BIT_RATE_1080P = 8500 * 1000;
+		public static final int BIT_RATE_1080P = 8000 * 1000;
 
 		/** 帧率 */
 		public static final int FRAME_RATE = Module.isPublic ? 24 : 30;
@@ -282,9 +282,9 @@ public interface Constant {
 		public static final boolean hasCloudCenter = !isPublic;
 
 		/** 是否有微密 */
-		public static final boolean hasWeme = false;//isPublic;
-		
-		/** 是否有翼卡在线*/
+		public static final boolean hasWeme = false;// isPublic;
+
+		/** 是否有翼卡在线 */
 		public static final boolean hasECarOnline = isPublic;
 
 		/** 是否有网络电台 */
