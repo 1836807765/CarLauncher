@@ -139,11 +139,10 @@ public class SleepOnOffService extends Service {
 							+ ",shouldStopWhenCrashVideoSave:"
 							+ MyApp.shouldStopWhenCrashVideoSave);
 
-					if (MyApp.shouldCrashRecord
-							|| MyApp.shouldStopWhenCrashVideoSave) {
-						if (powerManager.isScreenOn()) {
-							// sendBroadcast(new Intent("com.tchip.powerKey")
-							// .putExtra("value", "power_speech"));
+					if (MyApp.shouldStopWhenCrashVideoSave) {
+						if(!MyApp.shouldCrashRecord && !MyApp.isVideoReording){
+							MyApp.shouldCrashRecord = true;
+							MyApp.shouldStopWhenCrashVideoSave = true;
 						}
 					} else {
 						MyApp.shouldCrashRecord = true;
@@ -161,7 +160,6 @@ public class SleepOnOffService extends Service {
 					}
 				} else if ("take_photo_wenxin".equals(command)) {
 					MyApp.shouldTakeVoicePhoto = true; // 语音拍照
-					MyApp.shouldTakePhotoSlient = true; // 静音
 
 					sendKeyCode(KeyEvent.KEYCODE_HOME); // 发送Home键，回到主界面
 					if (!powerManager.isScreenOn()) { // 确保屏幕点亮

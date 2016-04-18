@@ -47,9 +47,6 @@ public class MyApp extends Application {
 	/** 语音拍照 */
 	public static boolean shouldTakeVoicePhoto = false;
 
-	/** 语音拍照需要静音 */
-	public static boolean shouldTakePhotoSlient = false;
-
 	/** 语音停止录像 */
 	public static boolean shouldStopRecordFromVoice = false;
 
@@ -116,6 +113,8 @@ public class MyApp extends Application {
 
 	/** 当前正在录像的视频名称 */
 	public static String nowRecordVideoName = "";
+	
+	public static String writeImageExifPath = "NULL";
 
 	public static enum CameraState {
 		/** 未初始化 */

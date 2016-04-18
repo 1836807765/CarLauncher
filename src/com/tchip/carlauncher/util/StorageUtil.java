@@ -20,7 +20,6 @@ import com.tchip.carlauncher.ui.activity.MainActivity;
 import com.tchip.carlauncher.view.AudioRecordDialog;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.media.ExifInterface;
 import android.os.StatFs;
 
@@ -141,56 +140,10 @@ public class StorageUtil {
 		}
 	}
 
-	/**
-	 * 空间是否不足，需要删除旧视频
-	 * 
-	 * 前录路径：/storage/sdcard2/tachograph/ *.mp4
-	 * 
-	 * 后录路径：/storage/sdcard2/tachograph_back/DrivingRecord/unlock/
-	 * 
-	 */
-	@Deprecated
-	public static boolean isStorageLessOld2() {
-		float sdTotal = StorageUtil.getSDTotalSize(Constant.Path.RECORD_SDCARD); // SD卡总空间
-		float sdFree = StorageUtil
-				.getSDAvailableSize(Constant.Path.RECORD_SDCARD); // SD剩余空间
-		float frontUse = (float) FileUtil.getTotalSizeOfFilesInDir(new File(
-				Constant.Path.RECORD_FRONT)); // 前置已用空间
-		float frontFree = sdTotal * (2 / 3) - frontUse;
-		int intFrontFree = (int) frontFree;
-		int intSdFree = (int) sdFree;
-		if (intSdFree < Constant.Record.SD_MIN_FREE_STORAGE) {
-			return true;
-		} else {
-			return intFrontFree < Constant.Record.SD_MIN_FREE_STORAGE;
-		}
-	}
-
-	public static boolean isStorageLessSingle() {
-		// float sdTotal =
-		// StorageUtil.getSDTotalSize(Constant.Path.RECORD_SDCARD); // SD卡总空间
-		float sdFree = StorageUtil
-				.getSDAvailableSize(Constant.Path.RECORD_SDCARD); // SD剩余空间
-		float frontUse = (float) FileUtil.getTotalSizeOfFilesInDir(new File(
-				Constant.Path.RECORD_FRONT)); // 前置已用空间
-
-		float backUse = (float) FileUtil.getTotalSizeOfFilesInDir(new File(
-				Constant.Path.RECORD_BACK)); // 后置已用空间
-		float frontTotal = (sdFree + frontUse + backUse) * 4 / 5; // 前置归属空间
-		float frontFree = frontTotal - frontUse; // 前置剩余空间
-		int intFrontFree = (int) frontFree;
-		MyLog.v("[isStroageLess]sdFree:" + sdFree + "\nfrontUse:" + frontUse
-				+ "\nfrontTotal:" + frontTotal + "\nfrontFree" + frontFree);
-		return intFrontFree < Constant.Record.SD_MIN_FREE_STORAGE;
-	}
-
-	public static boolean isStorageLessDouble() {
-		// float sdTotal = StorageUtil.getSDTotalSize(sdcardPath); // SD卡总空间
-		float sdFree = StorageUtil
-				.getSDAvailableSize(Constant.Path.RECORD_SDCARD);
-		int intSdFree = (int) sdFree;
-		MyLog.v("[StorageUtil]isStroageLess, sdFree:" + intSdFree);
-		return intSdFree < Constant.Record.SD_MIN_FREE_STORAGE;
+	/** SD卡空间不足 */
+	public static boolean isStorageLess() {
+		return Constant.Module.isRecordSingleCard ? FileUtil
+				.isStorageLessSingle() : FileUtil.isStorageLessDouble();
 	}
 
 	/**
@@ -200,8 +153,7 @@ public class StorageUtil {
 	 * 
 	 * 2.文件保存回调{@link MainActivity#onFileSave}
 	 */
-	public static boolean deleteOldestUnlockVideo(Context context) {
-
+	public static boolean releaseRecordStorage(Context context) {
 		if (!StorageUtil.isVideoCardExists()) {
 			MyLog.e("[Storageutil]deleteOldestUnlockVideo:No Video Card");
 			MyApp.shouldRecordNow = false;
@@ -212,8 +164,7 @@ public class StorageUtil {
 			DriveVideoDbHelper videoDb = new DriveVideoDbHelper(context);
 			AudioRecordDialog audioRecordDialog = new AudioRecordDialog(context);
 			StorageUtil.deleteEmptyVideoDirectory();
-			while (Constant.Module.isRecordSingleCard ? isStorageLessSingle()
-					: isStorageLessDouble()) {
+			while (isStorageLess()) {
 				int oldestUnlockVideoId = videoDb.getOldestUnlockVideoId();
 				// 删除较旧未加锁视频文件
 				if (oldestUnlockVideoId != -1) {
@@ -236,11 +187,8 @@ public class StorageUtil {
 				} else {
 					int oldestVideoId = videoDb.getOldestVideoId();
 					if (oldestVideoId == -1) {
-						if (Constant.Module.isRecordSingleCard ? isStorageLessSingle()
-								: isStorageLessDouble()) { // 此时若空间依然不足,提示用户清理存储（已不是行车视频的原因）
-
+						if (isStorageLess()) { // 此时若空间依然不足,提示用户清理存储（已不是行车视频的原因）
 							MyLog.e("[StorageUtil]Storage is full...");
-
 							String strNoStorage = context
 									.getResources()
 									.getString(
@@ -290,9 +238,6 @@ public class StorageUtil {
 			return true;
 		}
 	}
-	
-	
-	
 
 	/**
 	 * 删除数据库中不存在的错误视频文件
@@ -300,133 +245,122 @@ public class StorageUtil {
 	 * @param file
 	 */
 	public static void RecursionCheckFile(Context context, File file) {
-		DriveVideoDbHelper videoDb = new DriveVideoDbHelper(context); // 视频数据库
-		try {
-			String fileName = file.getName();
-			if (file.isFile() && !fileName.endsWith(".jpg")) {
-				if (fileName.startsWith(".")) {
-					// Delete file start with dot but not the recording one
-					if (!MyApp.isVideoReording) {
-						file.delete();
-						MyLog.v("[StorageUtil]RecursionCheckFile-Delete Error File start with DOT:"
-								+ fileName);
+
+		if (file.exists()) {
+			DriveVideoDbHelper videoDb = new DriveVideoDbHelper(context); // 视频数据库
+			try {
+				String fileName = file.getName();
+				if (file.isFile() && !fileName.endsWith(".jpg")) {
+					if (fileName.startsWith(".")) {
+						// Delete file start with dot but not the recording one
+						if (!MyApp.isVideoReording) {
+							file.delete();
+							MyLog.v("[StorageUtil]RecursionCheckFile-Delete Error File start with DOT:"
+									+ fileName);
+						}
+					} else {
+						boolean isVideoExist = videoDb.isVideoExist(fileName);
+						if (!isVideoExist) {
+							file.delete();
+							MyLog.v("[StorageUtil]RecursionCheckFile-Delete Error File:"
+									+ fileName);
+						}
 					}
-				} else {
-					boolean isVideoExist = videoDb.isVideoExist(fileName);
-					if (!isVideoExist) {
-						file.delete();
-						MyLog.v("[StorageUtil]RecursionCheckFile-Delete Error File:"
-								+ fileName);
-					}
-				}
-				return;
-			}
-			if (file.isDirectory()) {
-				File[] childFile = file.listFiles();
-				if (childFile == null || childFile.length == 0) {
 					return;
 				}
-				for (File f : childFile) {
-					RecursionCheckFile(context, f);
+				if (file.isDirectory()) {
+					File[] childFile = file.listFiles();
+					if (childFile == null || childFile.length == 0) {
+						return;
+					}
+					for (File f : childFile) {
+						RecursionCheckFile(context, f);
+					}
 				}
+			} catch (Exception e) {
+				MyLog.e("[StorageUtil]RecursionCheckFile-Catch Exception:"
+						+ e.toString());
 			}
-		} catch (Exception e) {
-			MyLog.e("[StorageUtil]RecursionCheckFile-Catch Exception:"
-					+ e.toString());
+
 		}
 	}
 
 	/**
-	 * 写入EXIF信息
+	 * 写入照片EXIF信息
 	 * 
 	 * @param context
 	 * @param imagePath
 	 */
-	public static void writeImageExif(Context context, String imagePath) {
-		// Android Way
-		try {
-			SharedPreferences sharedPreferences = context.getSharedPreferences(
-					Constant.MySP.NAME, Context.MODE_PRIVATE);
+	public static void writeImageExif() {
+		if (!MyApp.writeImageExifPath.equals("NULL")) {
+			try { // Android Way
+				ExifInterface exif = new ExifInterface(MyApp.writeImageExifPath);
+				exif.setAttribute(ExifInterface.TAG_ORIENTATION, ""
+						+ ExifInterface.ORIENTATION_NORMAL);
+				exif.setAttribute(ExifInterface.TAG_MAKE, "zenlane"); // 品牌
+				exif.setAttribute(ExifInterface.TAG_MODEL, "X755"); // 型号/机型
+				exif.saveAttributes();
+			} catch (Exception e) {
+				MyLog.e("[Android]Set Attribute Catch Exception:"
+						+ e.toString());
+				e.printStackTrace();
+			}
 
-			ExifInterface exif = new ExifInterface(imagePath);
-			String strLongitude = sharedPreferences.getString("longitude",
-					"0.00"); // 经度
-			double intLongitude = Double.parseDouble(strLongitude);
-			exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, strLongitude);
-			exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF,
-					intLongitude > 0.0f ? "E" : "W");
-			String strLatitude = sharedPreferences
-					.getString("latitude", "0.00"); // 纬度
-			double intLatitude = Double.parseDouble(strLatitude);
-			exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE, strLongitude);
-			exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF,
-					intLatitude > 0.0f ? "N" : "S");
-			exif.setAttribute(ExifInterface.TAG_ORIENTATION, ""
-					+ ExifInterface.ORIENTATION_NORMAL);
-			exif.setAttribute(ExifInterface.TAG_MAKE, "zenlane"); // 品牌
-			exif.setAttribute(ExifInterface.TAG_MODEL, "X755"); // 型号/机型
-			// exif.setAttribute(ExifInterface.TAG_FLASH, "1/30"); // 闪光灯
-			// exif.setAttribute(ExifInterface.TAG_FOCAL_LENGTH, "5/1"); // 焦距
-			// exif.setAttribute(ExifInterface.TAG_WHITE_BALANCE,
-			// ExifInterface.WHITEBALANCE_AUTO+"/1"); // 白平衡
-			// exif.setAttribute(ExifInterface.TAG_EXPOSURE_TIME, "1/30"); //
-			// // 曝光时间
-			// exif.setAttribute(ExifInterface.TAG_ISO, "100"); // 感光度
-			// exif.setAttribute(ExifInterface.TAG_APERTURE, "2/1"); // 光圈
-			exif.saveAttributes();
-		} catch (Exception e) {
-			MyLog.e("[Android]Set Attribute Catch Exception:" + e.toString());
-			e.printStackTrace();
-		}
+			// JpegHeaders Way
+			try {
+				JpegHeaders jpegHeaders = new JpegHeaders(
+						MyApp.writeImageExifPath);
+				App1Header exifHeader = jpegHeaders.getApp1Header();
+				// 遍历显示EXIF
+				// SortedMap tags = exifHeader.getTags();
+				// for (Map.Entry entry : tags.entrySet()) {
+				// System.out.println(entry.getKey() + "[" +
+				// entry.getKey().name
+				// + "]:" + entry.getValue());
+				// }
 
-		// JpegHeaders Way
-		try {
-			JpegHeaders jpegHeaders = new JpegHeaders(imagePath);
-			App1Header exifHeader = jpegHeaders.getApp1Header();
-			// 遍历显示EXIF
-			// SortedMap tags = exifHeader.getTags();
-			// for (Map.Entry entry : tags.entrySet()) {
-			// System.out.println(entry.getKey() + "[" + entry.getKey().name
-			// + "]:" + entry.getValue());
-			// }
+				// 修改EXIF
+				// exifHeader.setValue(Tag.DATETIMEORIGINAL,
+				// "2015:05:55 05:55:55");
+				exifHeader.setValue(Tag.ORIENTATION, "1"); // 浏览模式/方向:上/左
+				exifHeader.setValue(Tag.APERTUREVALUE, "22/10"); // 光圈：2.2
+				exifHeader.setValue(Tag.FOCALLENGTH, "7/2"); // 焦距：3.5mm
+				exifHeader.setValue(Tag.WHITEBALANCE, "0"); // 白平衡：自动
+				exifHeader.setValue(Tag.ISOSPEEDRATINGS, "100"); // ISO感光度：100
+				exifHeader.setValue(Tag.EXPOSURETIME, "1/30"); // 曝光时间：1/30
+				// 曝光补偿:EV值每增加1.0，相当于摄入的光线量增加一倍，如果照片过亮，要减小EV值，EV值每减小1.0，相当于摄入的光线量减小一倍
+				exifHeader.setValue(Tag.EXPOSUREBIASVALUE,
+						(1 + new Random().nextInt(10)) + "/10");
+				exifHeader.setValue(Tag.METERINGMODE, "1"); // 测光模式：平均
+				exifHeader.setValue(Tag.SATURATION,
+						"" + (5 + new Random().nextInt(10))); // 饱和度：5-15
+				exifHeader.setValue(Tag.FLASH, "0"); // 闪光灯：未使用
+				jpegHeaders.save(false); // 保存,参数：是否保存原文件为.old
+			} catch (FileNotFoundException e) {
+				e.printStackTrace();
+				MyLog.e("[JpegHeaders]Set Attribute Error,FileNotFoundException:"
+						+ e.toString());
+			} catch (ExifFormatException e) {
+				e.printStackTrace();
+				MyLog.e("[JpegHeaders]Set Attribute Error,ExifFormatException:"
+						+ e.toString());
+			} catch (TagFormatException e) {
+				e.printStackTrace();
+				MyLog.e("[JpegHeaders]Set Attribute Error,TagFormatException:"
+						+ e.toString());
+			} catch (IOException e) {
+				e.printStackTrace();
+				MyLog.e("[JpegHeaders]Set Attribute Error,IOException:"
+						+ e.toString());
+			} catch (JpegFormatException e) {
+				e.printStackTrace();
+				MyLog.e("[JpegHeaders]Set Attribute Error,JpegFormatException:"
+						+ e.toString());
+			}
+			MyApp.writeImageExifPath = "NULL";
 
-			// 修改EXIF
-			// exifHeader.setValue(Tag.DATETIMEORIGINAL, "2015:05:55 05:55:55");
-			exifHeader.setValue(Tag.ORIENTATION, "1"); // 浏览模式/方向:上/左
-			exifHeader.setValue(Tag.APERTUREVALUE, "22/10"); // 光圈：2.2
-			exifHeader.setValue(Tag.FOCALLENGTH, "7/2"); // 焦距：3.5mm
-			exifHeader.setValue(Tag.WHITEBALANCE, "0"); // 白平衡：自动
-			exifHeader.setValue(Tag.ISOSPEEDRATINGS, "100"); // ISO感光度：100
-			exifHeader.setValue(Tag.EXPOSURETIME, "1/30"); // 曝光时间：1/30
-			// 曝光补偿:EV值每增加1.0，相当于摄入的光线量增加一倍，如果照片过亮，要减小EV值，EV值每减小1.0，相当于摄入的光线量减小一倍
-			exifHeader.setValue(Tag.EXPOSUREBIASVALUE,
-					(1 + new Random().nextInt(10)) + "/10");
-			exifHeader.setValue(Tag.METERINGMODE, "1"); // 测光模式：平均
-			exifHeader.setValue(Tag.SATURATION,
-					"" + (5 + new Random().nextInt(10))); // 饱和度：5-15
-			exifHeader.setValue(Tag.FLASH, "0"); // 闪光灯：未使用
-			jpegHeaders.save(false); // 保存,参数：是否保存原文件为.old
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-			MyLog.e("[JpegHeaders]Set Attribute Error,FileNotFoundException:"
-					+ e.toString());
-		} catch (ExifFormatException e) {
-			e.printStackTrace();
-			MyLog.e("[JpegHeaders]Set Attribute Error,ExifFormatException:"
-					+ e.toString());
-		} catch (TagFormatException e) {
-			e.printStackTrace();
-			MyLog.e("[JpegHeaders]Set Attribute Error,TagFormatException:"
-					+ e.toString());
-		} catch (IOException e) {
-			e.printStackTrace();
-			MyLog.e("[JpegHeaders]Set Attribute Error,IOException:"
-					+ e.toString());
-		} catch (JpegFormatException e) {
-			e.printStackTrace();
-			MyLog.e("[JpegHeaders]Set Attribute Error,JpegFormatException:"
-					+ e.toString());
+		} else {
+
 		}
 	}
-
 }

@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.text.DecimalFormat;
 
+import com.tchip.carlauncher.Constant;
+
 public class FileUtil {
 
 	/**
@@ -11,7 +13,7 @@ public class FileUtil {
 	 * 
 	 * @return 剩余空间，单位：字节B
 	 */
-	public  static long getTotalSizeOfFilesInDir(File file) {
+	public static long getTotalSizeOfFilesInDir(File file) {
 		if (file.isFile())
 			return file.length();
 		final File[] children = file.listFiles();
@@ -21,6 +23,49 @@ public class FileUtil {
 				total += getTotalSizeOfFilesInDir(child);
 			}
 		return total;
+	}
+
+	/**
+	 * [双录到同一张SD卡]空间是否不足，需要删除旧视频
+	 * 
+	 * 前录路径：/storage/sdcard2/tachograph/ *.mp4
+	 * 
+	 * 后录路径：/storage/sdcard2/tachograph_back/DrivingRecord/unlock/
+	 * 
+	 */
+	public static boolean isStorageLessSingle() {
+		// float sdTotal =
+		// StorageUtil.getSDTotalSize(Constant.Path.RECORD_SDCARD); // SD卡总空间
+		float sdFree = StorageUtil
+				.getSDAvailableSize(Constant.Path.RECORD_SDCARD); // SD剩余空间
+		float frontUse = (float) FileUtil.getTotalSizeOfFilesInDir(new File(
+				Constant.Path.RECORD_FRONT)); // 前置已用空间
+
+		float backUse = (float) FileUtil.getTotalSizeOfFilesInDir(new File(
+				Constant.Path.RECORD_BACK)); // 后置已用空间
+		float frontTotal = (sdFree + frontUse + backUse) * 4 / 5; // 前置归属空间
+		float frontFree = frontTotal - frontUse; // 前置剩余空间
+		int intFrontFree = (int) frontFree;
+		MyLog.v("[isStroageLess]sdFree:" + sdFree + "\nfrontUse:" + frontUse
+				+ "\nfrontTotal:" + frontTotal + "\nfrontFree" + frontFree);
+		return intFrontFree < Constant.Record.SD_MIN_FREE_STORAGE;
+	}
+
+	/**
+	 * [双录到两张SD卡]空间是否不足，需要删除旧视频
+	 * 
+	 * 前录路径：/storage/sdcard2/tachograph/ *.mp4
+	 * 
+	 * 后录路径：/storage/sdcard2/tachograph_back/DrivingRecord/unlock/
+	 * 
+	 */
+	public static boolean isStorageLessDouble() {
+		// float sdTotal = StorageUtil.getSDTotalSize(sdcardPath); // SD卡总空间
+		float sdFree = StorageUtil
+				.getSDAvailableSize(Constant.Path.RECORD_SDCARD);
+		int intSdFree = (int) sdFree;
+		MyLog.v("[StorageUtil]isStroageLess, sdFree:" + intSdFree);
+		return intSdFree < Constant.Record.SD_MIN_FREE_STORAGE;
 	}
 
 	// ****************************************Below is OLD

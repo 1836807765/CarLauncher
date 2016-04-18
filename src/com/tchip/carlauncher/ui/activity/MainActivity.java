@@ -42,6 +42,8 @@ import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Looper;
 import android.os.Message;
 import android.os.PowerManager;
 import android.provider.Settings;
@@ -64,6 +66,27 @@ import android.widget.TextView;
 
 public class MainActivity extends Activity implements TachographCallback,
 		Callback {
+
+	private Context context;
+
+	/** onFileSave时释放空间 */
+	private static final HandlerThread fileSaveHandlerThread = new HandlerThread(
+			"filesave-thread");
+	static {
+		fileSaveHandlerThread.start();
+	}
+	private final Handler releaseStorageWhenFileSaveHandler = new ReleaseStorageWhenFileSaveHandler(
+			fileSaveHandlerThread.getLooper());
+	private Handler mMainHandler; // 主线程Handler
+
+	/** startRecord时释放空间 */
+	private static final HandlerThread startRecordHandlerThread = new HandlerThread(
+			"startrecord-thread");
+	static {
+		startRecordHandlerThread.start();
+	}
+	private final Handler releaseStorageWhenStartRecordHandler = new ReleaseStorageWhenStartRecordHandler(
+			startRecordHandlerThread.getLooper());
 
 	private SharedPreferences sharedPreferences;
 	private Editor editor;
@@ -133,16 +156,19 @@ public class MainActivity extends Activity implements TachographCallback,
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		mMainHandler = new Handler(this.getMainLooper());
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
 				WindowManager.LayoutParams.FLAG_FULLSCREEN);
 		setContentView(R.layout.activity_main);
 
+		context = getApplicationContext();
+
 		sharedPreferences = getSharedPreferences(Constant.MySP.NAME,
 				Context.MODE_PRIVATE);
 		editor = sharedPreferences.edit();
 
-		videoDb = new DriveVideoDbHelper(getApplicationContext()); // 视频数据库
+		videoDb = new DriveVideoDbHelper(context); // 视频数据库
 		audioRecordDialog = new AudioRecordDialog(MainActivity.this); // 提示框
 		powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE); // 获取屏幕状态
 		// 3G信号
@@ -430,7 +456,7 @@ public class MainActivity extends Activity implements TachographCallback,
 		public void run() {
 			try {
 				initialService();
-				CheckErrorFile(); // 检查并删除异常视频文件
+				StartCheckErrorFileThread(); // 检查并删除异常视频文件
 				// 自动录像:如果已经在录像则不处理
 				if (Constant.Record.autoRecord && !MyApp.isVideoReording) {
 					Thread.sleep(Constant.Record.autoRecordDelay);
@@ -525,14 +551,16 @@ public class MainActivity extends Activity implements TachographCallback,
 					}
 				}
 				if (MyApp.shouldCrashRecord) { // 停车侦测录像
-					if (Constant.Record.parkVideoLock) { // 是否需要加锁
-						MyApp.isVideoLock = true;
-					}
 					MyApp.shouldCrashRecord = false;
-					if (!MyApp.isMainForeground) { // 发送Home键，回到主界面
-						sendKeyCode(KeyEvent.KEYCODE_HOME);
+					if (!MyApp.isVideoReording) {
+						if (Constant.Record.parkVideoLock) { // 是否需要加锁
+							MyApp.isVideoLock = true;
+						}
+						if (!MyApp.isMainForeground) { // 发送Home键，回到主界面
+							sendKeyCode(KeyEvent.KEYCODE_HOME);
+						}
+						new Thread(new RecordWhenCrashThread()).start();
 					}
-					new Thread(new RecordWhenCrashThread()).start();
 				}
 				if (MyApp.shouldTakePhotoWhenAccOff) { // ACC下电拍照
 					MyApp.shouldTakePhotoWhenAccOff = false;
@@ -636,11 +664,7 @@ public class MainActivity extends Activity implements TachographCallback,
 						if (!MyApp.isMainForeground) {
 							sendKeyCode(KeyEvent.KEYCODE_HOME); // 回到主界面
 						}
-						if (startRecordTask() == 0) {
-							setRecordState(true);
-						} else {
-							MyLog.e("Start Record Failed");
-						}
+						startRecordTask();
 					}
 					MyLog.v("[Record]isVideoReording:" + MyApp.isVideoReording);
 				} catch (Exception e) {
@@ -687,7 +711,15 @@ public class MainActivity extends Activity implements TachographCallback,
 							sendKeyCode(KeyEvent.KEYCODE_HOME);
 						}
 						setInterval(3 * 60); // 防止在分段一分钟的时候，停车守卫录出1分和0秒两段视频
-						new Thread(new StartRecordThread()).start(); // 开始录像
+
+						StartCheckErrorFileThread();
+						if (!MyApp.isVideoReording) {
+							if (startRecordTask() == 0) {
+								setRecordState(true);
+							} else {
+								MyLog.e("Start Record Failed");
+							}
+						}
 					}
 					setupRecordViews();
 					MyLog.v("[Record]isVideoReording:" + MyApp.isVideoReording);
@@ -743,12 +775,8 @@ public class MainActivity extends Activity implements TachographCallback,
 			case 1:
 				// startRecord();
 				if (!MyApp.isVideoReording) {
-					if (startRecordTask() == 0) {
-						setRecordState(true);
+					startRecordTask();
 
-					} else {
-						MyLog.e("Start Record Failed");
-					}
 				}
 				break;
 
@@ -1043,9 +1071,14 @@ public class MainActivity extends Activity implements TachographCallback,
 		textRecordTime.setText("00 : 00");
 	}
 
+	Thread mRunSecond = null;
+
 	/** 开启录像跑秒线程 */
 	private void startUpdateRecordTimeThread() {
 		if (!MyApp.isUpdateTimeThreadRun) {
+			if (mRunSecond != null) {
+				// mRunSecond.interrupt();
+			}
 			new Thread(new UpdateRecordTimeThread()).start(); // 更新录制时间
 		} else {
 			MyLog.e("[Main]UpdateRecordTimeThread already run");
@@ -1579,10 +1612,8 @@ public class MainActivity extends Activity implements TachographCallback,
 					if (MyApp.shouldStopWhenCrashVideoSave) {
 						MyApp.shouldStopWhenCrashVideoSave = false;
 					}
-
 				}
 			}
-
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -1831,7 +1862,7 @@ public class MainActivity extends Activity implements TachographCallback,
 
 		@Override
 		public void run() {
-			CheckErrorFile();
+			StartCheckErrorFileThread();
 			int i = 0;
 			while (i < 5) {
 				if (MyApp.isVideoReording) {
@@ -1889,35 +1920,6 @@ public class MainActivity extends Activity implements TachographCallback,
 		}
 	};
 
-	/**
-	 * 开启录像
-	 * 
-	 * @return 0:成功 -1:失败
-	 */
-	public int startRecordTask() {
-		if (carRecorder != null) {
-			if (StorageUtil.deleteOldestUnlockVideo(MainActivity.this)) {
-				MyLog.d("Record Start");
-				setDirectory(Constant.Path.SDCARD_2); // 设置保存路径
-
-				// 设置录像静音
-				if (sharedPreferences.getBoolean("videoMute",
-						Constant.Record.muteDefault)) {
-					setMute(true, false);
-				} else {
-					setMute(false, false);
-				}
-				resetRecordTimeText();
-
-				if (!MyApp.shouldStopWhenCrashVideoSave) { // 停车守卫不播放录音
-					HintUtil.playAudio(getApplicationContext(), FILE_TYPE_VIDEO);
-				}
-				return carRecorder.start();
-			}
-		}
-		return -1;
-	}
-
 	/** 视频SD卡不存在提示 */
 	private void noVideoSDHint() {
 		if (MyApp.isAccOn) {
@@ -1927,33 +1929,6 @@ public class MainActivity extends Activity implements TachographCallback,
 			new Thread(new dismissDialogThread()).start();
 			HintUtil.speakVoice(MainActivity.this, strNoSD);
 		}
-	}
-
-	/** 检查并删除异常视频文件：SD存在但数据库中不存在的文件 */
-	private void CheckErrorFile() {
-		MyLog.v("[CheckErrorFile]isVideoChecking:" + isVideoChecking);
-		if (!isVideoChecking) {
-			new Thread(new CheckVideoThread()).start();
-		}
-	}
-
-	/** 当前是否正在校验错误视频 */
-	private boolean isVideoChecking = false;
-
-	private class CheckVideoThread implements Runnable {
-
-		@Override
-		public void run() {
-			MyLog.v("[CheckVideoThread]START:" + DateUtil.getTimeStr("mm:ss"));
-			isVideoChecking = true;
-			File file = new File(Constant.Path.RECORD_FRONT);
-			if (file.exists()) {
-				StorageUtil.RecursionCheckFile(MainActivity.this, file);
-				MyLog.v("[CheckVideoThread]END:" + DateUtil.getTimeStr("mm:ss"));
-			}
-			isVideoChecking = false;
-		}
-
 	}
 
 	public class dismissDialogThread implements Runnable {
@@ -1996,9 +1971,8 @@ public class MainActivity extends Activity implements TachographCallback,
 			// 停车守卫不播放声音
 			if (MyApp.shouldStopWhenCrashVideoSave) {
 				MyApp.shouldStopWhenCrashVideoSave = false;
-			} else {
-				HintUtil.playAudio(getApplicationContext(), FILE_TYPE_VIDEO);
 			}
+			HintUtil.playAudio(getApplicationContext(), FILE_TYPE_VIDEO);
 			return carRecorder.stop();
 		}
 		return -1;
@@ -2071,11 +2045,7 @@ public class MainActivity extends Activity implements TachographCallback,
 				setDirectory(Constant.Path.SDCARD_2);
 			}
 
-			if (MyApp.shouldTakePhotoSlient) {
-				MyApp.shouldTakePhotoSlient = false;
-			} else {
-				HintUtil.playAudio(getApplicationContext(), FILE_TYPE_IMAGE);
-			}
+			HintUtil.playAudio(getApplicationContext(), FILE_TYPE_IMAGE);
 			carRecorder.takePicture();
 		}
 	}
@@ -2238,11 +2208,106 @@ public class MainActivity extends Activity implements TachographCallback,
 		}
 	}
 
+	class ReleaseStorageWhenStartRecordHandler extends Handler {
+
+		public ReleaseStorageWhenStartRecordHandler(Looper looper) {
+			super(looper);
+		}
+
+		@Override
+		public void handleMessage(Message msg) {
+			switch (msg.what) {
+			case 1:
+				this.removeMessages(1);
+				final boolean isDeleteSuccess = StorageUtil
+						.releaseRecordStorage(context);
+				mMainHandler.post(new Runnable() {
+
+					@Override
+					public void run() {
+						if (isDeleteSuccess) {
+							HintUtil.playAudio(getApplicationContext(),
+									FILE_TYPE_VIDEO);
+							if (carRecorder.start() == 0) {
+								setRecordState(true);
+							}
+						}
+
+					}
+				});
+				this.removeMessages(1);
+				break;
+			}
+		}
+
+	}
+
+	/**
+	 * 开启录像
+	 * 
+	 * @return 0:成功 -1:失败
+	 */
+	public int startRecordTask() {
+		if (carRecorder != null) {
+			MyLog.d("Record Start");
+			setDirectory(Constant.Path.SDCARD_2); // 设置保存路径
+			// 设置录像静音
+			if (sharedPreferences.getBoolean("videoMute",
+					Constant.Record.muteDefault)) {
+				setMute(true, false);
+			} else {
+				setMute(false, false);
+			}
+			resetRecordTimeText();
+
+			Message messageReleaseWhenStartRecord = new Message();
+			messageReleaseWhenStartRecord.what = 1;
+			releaseStorageWhenStartRecordHandler
+					.sendMessage(messageReleaseWhenStartRecord);
+			if (!StorageUtil.isStorageLess()) {
+				return 0;
+			} else {
+				return -1;
+			}
+		}
+		return -1;
+	}
+
+	// TODO:
+
 	@Override
 	public void onFileStart(int type, String path) {
 		if (type == 1) {
 			MyApp.nowRecordVideoName = path.split("/")[5];
 		}
+	}
+
+	class ReleaseStorageWhenFileSaveHandler extends Handler {
+
+		public ReleaseStorageWhenFileSaveHandler(Looper looper) {
+			super(looper);
+		}
+
+		@Override
+		public void handleMessage(Message msg) {
+			switch (msg.what) {
+			case 1:
+				this.removeMessages(1);
+				boolean isDeleteSuccess = StorageUtil
+						.releaseRecordStorage(context);
+				mMainHandler.post(new Runnable() {
+
+					@Override
+					public void run() {
+						// main thread
+
+					}
+				});
+				this.removeMessages(1);
+				break;
+			}
+		}
+
 	}
 
 	/**
@@ -2259,7 +2324,10 @@ public class MainActivity extends Activity implements TachographCallback,
 	public void onFileSave(int type, String path) {
 		try {
 			if (type == 1) { // 视频
-				StorageUtil.deleteOldestUnlockVideo(MainActivity.this);
+				Message messageDeleteUnlockVideo = new Message();
+				messageDeleteUnlockVideo.what = 1;
+				releaseStorageWhenFileSaveHandler
+						.sendMessage(messageDeleteUnlockVideo);
 
 				String videoName = path.split("/")[5];
 				int videoResolution = (resolutionState == Constant.Record.STATE_RESOLUTION_720P) ? 720
@@ -2279,14 +2347,15 @@ public class MainActivity extends Activity implements TachographCallback,
 						videoResolution);
 				videoDb.addDriveVideo(driveVideo);
 
-				CheckErrorFile(); // 执行onFileSave时，此file已经不隐藏，下个正在录的为隐藏
+				StartCheckErrorFileThread(); // 执行onFileSave时，此file已经不隐藏，下个正在录的为隐藏
 				MyLog.v("[onFileSave]videoLock:" + videoLock
 						+ ", isVideoLockSecond:" + MyApp.isVideoLockSecond);
 			} else { // 图片
 				HintUtil.showToast(MainActivity.this,
 						getResources().getString(R.string.hint_photo_save));
 
-				StorageUtil.writeImageExif(MainActivity.this, path);
+				MyApp.writeImageExifPath = path;
+				new Thread(new WriteImageExifThread()).start();
 
 				if (MyApp.shouldSendPathToDSA) {
 					MyApp.shouldSendPathToDSA = false;
@@ -2308,15 +2377,47 @@ public class MainActivity extends Activity implements TachographCallback,
 				sendBroadcast(intentImageSave);
 			}
 
-			// 更新Media Database
 			sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
-					Uri.parse("file://" + path)));
+					Uri.parse("file://" + path))); // 更新Media Database
 			MyLog.d("[onFileSave]Type=" + type + ",Save path:" + path);
-
 		} catch (Exception e) {
 			e.printStackTrace();
 			MyLog.e("[Main]onFileSave catch Exception:" + e.toString());
 		}
+	}
+
+	private class WriteImageExifThread implements Runnable {
+
+		@Override
+		public void run() {
+			StorageUtil.writeImageExif();
+		}
+
+	}
+
+	/** 检查并删除异常视频文件：SD存在但数据库中不存在的文件 */
+	private void StartCheckErrorFileThread() {
+		MyLog.v("[CheckErrorFile]isVideoChecking:" + isVideoChecking);
+		if (!isVideoChecking) {
+			new Thread(new CheckVideoThread()).start();
+		}
+	}
+
+	/** 当前是否正在校验错误视频 */
+	private boolean isVideoChecking = false;
+
+	private class CheckVideoThread implements Runnable {
+
+		@Override
+		public void run() {
+			MyLog.v("[CheckVideoThread]START:" + DateUtil.getTimeStr("mm:ss"));
+			isVideoChecking = true;
+			File file = new File(Constant.Path.RECORD_FRONT);
+			StorageUtil.RecursionCheckFile(MainActivity.this, file);
+			MyLog.v("[CheckVideoThread]END:" + DateUtil.getTimeStr("mm:ss"));
+			isVideoChecking = false;
+		}
+
 	}
 
 	public void setup() {

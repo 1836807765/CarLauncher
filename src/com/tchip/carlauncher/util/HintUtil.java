@@ -1,5 +1,6 @@
 package com.tchip.carlauncher.util;
 
+import com.tchip.carlauncher.MyApp;
 import com.tchip.carlauncher.R;
 import com.tchip.carlauncher.service.FloatWindowService;
 
@@ -12,16 +13,21 @@ import android.widget.Toast;
 public class HintUtil {
 
 	public static void playAudio(Context context, int type) {
-		AudioManager audioManager = (AudioManager) context
-				.getSystemService(Context.AUDIO_SERVICE);
-		MediaPlayer mediaPlayer;
-		if (audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION) > 0) {
-			if (type == com.tchip.tachograph.TachographCallback.FILE_TYPE_IMAGE) {
-				mediaPlayer = MediaPlayer.create(context, R.raw.camera_image);
-			} else {
-				mediaPlayer = MediaPlayer.create(context, R.raw.camera_video);
+		if (MyApp.isAccOn) {
+			AudioManager audioManager = (AudioManager) context
+					.getSystemService(Context.AUDIO_SERVICE);
+			MediaPlayer mediaPlayer;
+			if (audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION) > 0) {
+				if (type == com.tchip.tachograph.TachographCallback.FILE_TYPE_IMAGE) {
+					mediaPlayer = MediaPlayer.create(context,
+							R.raw.camera_image);
+				} else {
+					mediaPlayer = MediaPlayer.create(context,
+							R.raw.camera_video);
+				}
+
+				mediaPlayer.start();
 			}
-			mediaPlayer.start();
 		}
 	}
 

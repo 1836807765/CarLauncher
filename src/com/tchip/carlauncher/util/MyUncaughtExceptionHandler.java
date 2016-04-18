@@ -79,7 +79,7 @@ public class MyUncaughtExceptionHandler implements UncaughtExceptionHandler {
 			mDefaultHandler.uncaughtException(thread, ex);
 		} else {
 			try {
-				Thread.sleep(1000);
+				Thread.sleep(2000);
 			} catch (InterruptedException e) {
 				Log.e(TAG, "error : ", e);
 			}
