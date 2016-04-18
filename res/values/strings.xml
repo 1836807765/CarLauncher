@@ -52,4 +52,7 @@
     <string name="hint_save_video_error">视频保存失败</string>
     <string name="hint_save_photo_error">图片保存失败</string>
 
+    <!-- MyUncaughtExceptionHandler -->
+    <string name="app_has_exception">很抱歉录像异常,正在尝试恢复,如黑屏请重启系统</string>
+
 </resources>

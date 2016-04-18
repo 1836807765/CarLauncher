@@ -158,8 +158,8 @@ public class MainActivity extends Activity implements TachographCallback,
 		networkStateReceiver = new NetworkStateReceiver();
 		IntentFilter networkFilter = new IntentFilter();
 		networkFilter.addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED);
-		// networkFilter.addAction(Constant.Broadcast.BT_CONNECTED);
-		// networkFilter.addAction(Constant.Broadcast.BT_DISCONNECTED);
+		networkFilter.addAction(Constant.Broadcast.BT_CONNECTED);
+		networkFilter.addAction(Constant.Broadcast.BT_DISCONNECTED);
 		registerReceiver(networkStateReceiver, networkFilter);
 
 		initialLayout();
@@ -216,7 +216,7 @@ public class MainActivity extends Activity implements TachographCallback,
 			setSurfaceLarge(false); // 按HOME键将预览区域还原为小窗口
 
 			setBluetoothIcon(NetworkUtil
-					.isExtBluetoothOn(getApplicationContext()));
+					.isExtBluetoothOn(getApplicationContext()) ? 0 : -1); // 外置蓝牙
 
 			if (!MyApp.isBTPlayMusic) { // 蓝牙播放音乐时不设置触摸声音
 				Settings.System.putString(getContentResolver(),
@@ -276,9 +276,9 @@ public class MainActivity extends Activity implements TachographCallback,
 			if (action.equals(Intent.ACTION_AIRPLANE_MODE_CHANGED)) {
 				setAirplaneIcon(intent.getBooleanExtra("state", false));
 			} else if (action.equals(Constant.Broadcast.BT_CONNECTED)) {
-				setBluetoothIcon(true);
+				setBluetoothIcon(1);
 			} else if (action.equals(Constant.Broadcast.BT_DISCONNECTED)) {
-				setBluetoothIcon(true);
+				setBluetoothIcon(0);
 			}
 		}
 	}
@@ -306,11 +306,37 @@ public class MainActivity extends Activity implements TachographCallback,
 		}
 	}
 
-	/** 设置外置蓝牙图标 */
-	private void setBluetoothIcon(boolean isBluetoothOn) {
-		imageBluetooth.setBackground(getResources().getDrawable(
-				isBluetoothOn ? R.drawable.ic_qs_bluetooth_on
-						: R.drawable.ic_qs_bluetooth_off));
+	/**
+	 * 设置外置蓝牙图标:
+	 * 
+	 * 0:打开未连接
+	 * 
+	 * 1:打开并连接
+	 * 
+	 * -1:关闭
+	 */
+	private void setBluetoothIcon(int bluetoothState) {
+		boolean isExtBluetoothOn = NetworkUtil
+				.isExtBluetoothOn(getApplicationContext());
+
+		switch (bluetoothState) {
+		case 0: // 打开未连接
+			imageBluetooth.setBackground(getResources().getDrawable(
+					R.drawable.ic_qs_bluetooth_not_connected));
+			break;
+
+		case 1:// 打开并连接
+			imageBluetooth.setBackground(getResources().getDrawable(
+					R.drawable.ic_qs_bluetooth_on));
+			break;
+
+		case -1: // 关闭
+		default:
+			imageBluetooth.setBackground(getResources().getDrawable(
+					R.drawable.ic_qs_bluetooth_off));
+			break;
+
+		}
 	}
 
 	/** 设置位置图标 */
@@ -968,25 +994,21 @@ public class MainActivity extends Activity implements TachographCallback,
 	/** 切换录像预览窗口的大小 */
 	private void setSurfaceLarge(boolean isLarge) {
 		if (isLarge) {
-			if (!isSurfaceLarge) {
-				// 16/9 = 1.7778;854/480 = 1.7791
-				int widthFull = 854; // 854;
-				int heightFull = 480;
-				surfaceCamera.setLayoutParams(new RelativeLayout.LayoutParams(
-						widthFull, heightFull));
-				isSurfaceLarge = true;
-				updateButtonState(true);
-			}
+			// 16/9 = 1.7778;854/480 = 1.7791
+			int widthFull = 854; // 854;
+			int heightFull = 480;
+			surfaceCamera.setLayoutParams(new RelativeLayout.LayoutParams(
+					widthFull, heightFull));
+			isSurfaceLarge = true;
+			updateButtonState(true);
 		} else {
-			if (isSurfaceLarge) {
-				int widthSmall = 490; // 480
-				int heightSmall = 276; // 270
-				surfaceCamera.setLayoutParams(new RelativeLayout.LayoutParams(
-						widthSmall, heightSmall));
-				isSurfaceLarge = false;
-				hsvMain.scrollTo(0, 0);
-				updateButtonState(false);
-			}
+			int widthSmall = 490; // 480
+			int heightSmall = 276; // 270
+			surfaceCamera.setLayoutParams(new RelativeLayout.LayoutParams(
+					widthSmall, heightSmall));
+			isSurfaceLarge = false;
+			hsvMain.scrollTo(0, 0);
+			updateButtonState(false);
 		}
 	}
 
@@ -1060,7 +1082,14 @@ public class MainActivity extends Activity implements TachographCallback,
 					messageVideoLock.what = 4;
 					updateRecordTimeHandler.sendMessage(messageVideoLock);
 				}
-				if (MyApp.isVideoCardEject) { // 录像时视频SD卡拔出停止录像
+				if (MyApp.isAppException) { // 程序异常,停止录像
+					MyApp.isAppException = false;
+					MyLog.e("App exception, stop record!");
+					Message messageException = new Message();
+					messageException.what = 8;
+					updateRecordTimeHandler.sendMessage(messageException);
+					return;
+				} else if (MyApp.isVideoCardEject) { // 录像时视频SD卡拔出停止录像
 					MyLog.e("SD card remove badly or power unconnected, stop record!");
 					Message messageEject = new Message();
 					messageEject.what = 2;
@@ -1255,6 +1284,16 @@ public class MainActivity extends Activity implements TachographCallback,
 				HintUtil.speakVoice(MainActivity.this, strVideoCardFormat);
 				audioRecordDialog.showErrorDialog(strVideoCardFormat);
 				new Thread(new dismissDialogThread()).start();
+				break;
+
+			case 8: // 程序异常，停止录像
+				MyLog.v("[UpdateRecordTimeHandler]stopRecorder() 8");
+				MyApp.shouldRecordNow = false;
+				if (stopRecorder() == 0) {
+					setRecordState(false);
+				} else {
+					MyLog.e("stopRecorder Error 8");
+				}
 				break;
 
 			default:
@@ -2301,9 +2340,7 @@ public class MainActivity extends Activity implements TachographCallback,
 				surfaceCamera.setLayoutParams(new RelativeLayout.LayoutParams(
 						widthSmall, heightSmall));
 				isSurfaceLarge = false;
-
-				hsvMain.scrollTo(0, 0); // 更新HorizontalScrollView阴影
-
+				hsvMain.scrollTo(0, 0);
 				updateButtonState(false);
 			}
 			return true;

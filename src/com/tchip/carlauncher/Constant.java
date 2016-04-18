@@ -6,7 +6,7 @@ import android.os.Environment;
 
 public interface Constant {
 	/** Debug：打印Log */
-	public static final boolean isDebug = false;
+	public static final boolean isDebug = true;
 
 	/** 日志Tag */
 	public static final String TAG = "AZ";
@@ -267,7 +267,7 @@ public interface Constant {
 
 	public static final class Module {
 		/** 是否是公版软件 */
-		public static final boolean isPublic = true;
+		public static final boolean isPublic = false;
 
 		/** 双录是否录制到单卡 */
 		public static final boolean isRecordSingleCard = true;

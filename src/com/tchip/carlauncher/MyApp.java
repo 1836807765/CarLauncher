@@ -5,8 +5,11 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import com.tchip.carlauncher.util.MyLog;
+import com.tchip.carlauncher.util.MyUncaughtExceptionHandler;
 
 public class MyApp extends Application {
+	/** 应用出错:需要停止录像 */
+	public static boolean isAppException = false;
 
 	/** 是否处于低功耗待机状态 */
 	public static boolean isSleeping = false;
@@ -22,13 +25,13 @@ public class MyApp extends Application {
 
 	/** 插入录像卡：需要启动录像 */
 	public static boolean shouldMountRecord = false;
-	
+
 	/** 是否应该录像 */
 	public static boolean shouldRecordNow = false;
 
 	/** 需要开启录像大视图 */
 	public static boolean shouldOpenRecordFullScreen = false;
-	
+
 	/** 需要关闭录像大视图 */
 	public static boolean shouldCloseRecordFullScreen = false;
 
@@ -43,7 +46,7 @@ public class MyApp extends Application {
 
 	/** 语音拍照 */
 	public static boolean shouldTakeVoicePhoto = false;
-	
+
 	/** 语音拍照需要静音 */
 	public static boolean shouldTakePhotoSlient = false;
 
@@ -61,7 +64,7 @@ public class MyApp extends Application {
 
 	/** 是否正在录像 */
 	public static boolean isVideoReording = false;
-	
+
 	/** 更新录像时间线程是否正在运行 */
 	public static boolean isUpdateTimeThreadRun = false;
 
@@ -85,7 +88,7 @@ public class MyApp extends Application {
 
 	/** SD卡取出 */
 	public static boolean isVideoCardEject = false;
-	
+
 	/** SD卡准备格式化 */
 	public static boolean isVideoCardFormat = false;
 
@@ -144,6 +147,10 @@ public class MyApp extends Application {
 
 	@Override
 	public void onCreate() {
+
+		MyUncaughtExceptionHandler myUncaughtExceptionHandler = MyUncaughtExceptionHandler
+				.getInstance();
+		myUncaughtExceptionHandler.init(getApplicationContext());
 
 		initialCrashData();
 		super.onCreate();
