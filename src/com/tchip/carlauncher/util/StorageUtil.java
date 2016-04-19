@@ -156,7 +156,6 @@ public class StorageUtil {
 	public static boolean releaseRecordStorage(Context context) {
 		if (!StorageUtil.isVideoCardExists()) {
 			MyLog.e("[Storageutil]deleteOldestUnlockVideo:No Video Card");
-			MyApp.shouldRecordNow = false;
 			return false;
 		}
 		try {
@@ -197,7 +196,6 @@ public class StorageUtil {
 							audioRecordDialog.showErrorDialog(strNoStorage);
 							HintUtil.speakVoice(context, strNoStorage);
 
-							MyApp.shouldRecordNow = false;
 							return false;
 						}
 					} else {

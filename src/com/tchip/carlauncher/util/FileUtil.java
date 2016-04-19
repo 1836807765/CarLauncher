@@ -46,9 +46,14 @@ public class FileUtil {
 		float frontTotal = (sdFree + frontUse + backUse) * 4 / 5; // 前置归属空间
 		float frontFree = frontTotal - frontUse; // 前置剩余空间
 		int intFrontFree = (int) frontFree;
-		MyLog.v("[isStroageLess]sdFree:" + sdFree + "\nfrontUse:" + frontUse
-				+ "\nfrontTotal:" + frontTotal + "\nfrontFree" + frontFree);
-		return intFrontFree < Constant.Record.SD_MIN_FREE_STORAGE;
+		int intSdFree = (int) sdFree;
+
+		boolean isStorageLess = intFrontFree < Constant.Record.SD_MIN_FREE_STORAGE
+				|| intSdFree < Constant.Record.SD_MIN_FREE_STORAGE;
+		MyLog.v("[isStroageLess]" + isStorageLess + ",sdFree:" + sdFree
+				+ "\nfrontUse:" + frontUse + "\nfrontTotal:" + frontTotal
+				+ "\nfrontFree" + frontFree);
+		return isStorageLess;
 	}
 
 	/**

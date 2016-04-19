@@ -26,9 +26,6 @@ public class MyApp extends Application {
 	/** 插入录像卡：需要启动录像 */
 	public static boolean shouldMountRecord = false;
 
-	/** 是否应该录像 */
-	public static boolean shouldRecordNow = false;
-
 	/** 需要开启录像大视图 */
 	public static boolean shouldOpenRecordFullScreen = false;
 
@@ -113,7 +110,7 @@ public class MyApp extends Application {
 
 	/** 当前正在录像的视频名称 */
 	public static String nowRecordVideoName = "";
-	
+
 	public static String writeImageExifPath = "NULL";
 
 	public static enum CameraState {

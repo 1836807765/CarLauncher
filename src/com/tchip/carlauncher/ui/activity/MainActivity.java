@@ -539,10 +539,6 @@ public class MainActivity extends Activity implements TachographCallback,
 						MyApp.shouldOpenRecordFullScreen = false;
 						setSurfaceLarge(true); // 大视图
 					}
-					if (MyApp.shouldRecordNow && !MyApp.isVideoReording) {
-						MyApp.shouldRecordNow = false;
-						new Thread(new RestartRecordThread()).start(); // 开始录像
-					}
 				}
 				if (MyApp.shouldMountRecord) {
 					MyApp.shouldMountRecord = false;
@@ -1088,7 +1084,6 @@ public class MainActivity extends Activity implements TachographCallback,
 	/** 设置当前录像状态 */
 	private void setRecordState(boolean isVideoRecord) {
 		if (isVideoRecord) {
-			MyApp.shouldRecordNow = true;
 			recordState = Constant.Record.STATE_RECORD_STARTED;
 			MyApp.isVideoReording = true;
 			textRecordTime.setVisibility(View.VISIBLE);
@@ -1226,7 +1221,6 @@ public class MainActivity extends Activity implements TachographCallback,
 
 			case 2: // SD卡异常移除：停止录像
 				MyLog.v("[UpdateRecordTimeHandler]stopRecorder() 2");
-				MyApp.shouldRecordNow = false;
 				if (stopRecorder() == 0) {
 					setRecordState(false);
 				} else {
@@ -1244,7 +1238,6 @@ public class MainActivity extends Activity implements TachographCallback,
 
 			case 3: // 电源断开，停止录像
 				MyLog.v("[UpdateRecordTimeHandler]stopRecorder() 3");
-				MyApp.shouldRecordNow = false;
 				if (stopRecorder() == 0) {
 					setRecordState(false);
 				} else {
@@ -1277,7 +1270,6 @@ public class MainActivity extends Activity implements TachographCallback,
 
 			case 5: // 进入休眠，停止录像
 				MyLog.v("[UpdateRecordTimeHandler]stopRecorder() 5");
-				MyApp.shouldRecordNow = false;
 				if (stopRecorder() == 0) {
 					setRecordState(false);
 				} else {
@@ -1293,7 +1285,6 @@ public class MainActivity extends Activity implements TachographCallback,
 
 			case 6: // 语音命令：停止录像
 				MyLog.v("[UpdateRecordTimeHandler]stopRecorder() 6");
-				MyApp.shouldRecordNow = false;
 				if (stopRecorder() == 0) {
 					setRecordState(false);
 				} else {
@@ -1303,7 +1294,6 @@ public class MainActivity extends Activity implements TachographCallback,
 
 			case 7:
 				MyLog.v("[UpdateRecordTimeHandler]stopRecorder() 7");
-				MyApp.shouldRecordNow = false;
 				if (stopRecorder() == 0) {
 					setRecordState(false);
 				} else {
@@ -1321,7 +1311,6 @@ public class MainActivity extends Activity implements TachographCallback,
 
 			case 8: // 程序异常，停止录像
 				MyLog.v("[UpdateRecordTimeHandler]stopRecorder() 8");
-				MyApp.shouldRecordNow = false;
 				if (stopRecorder() == 0) {
 					setRecordState(false);
 				} else {
@@ -1369,7 +1358,6 @@ public class MainActivity extends Activity implements TachographCallback,
 									getResources().getString(
 											R.string.hint_record_start));
 							startRecord();
-							MyApp.shouldRecordNow = true;
 						} else {
 							noVideoSDHint();
 						}
@@ -1377,7 +1365,6 @@ public class MainActivity extends Activity implements TachographCallback,
 						HintUtil.speakVoice(MainActivity.this, getResources()
 								.getString(R.string.hint_record_stop));
 						MyLog.v("[onClick]stopRecorder()");
-						MyApp.shouldRecordNow = false;
 						stopRecord();
 					}
 				}
@@ -1403,7 +1390,6 @@ public class MainActivity extends Activity implements TachographCallback,
 					// 切换分辨率录像停止，需要重置时间
 					MyApp.shouldVideoRecordWhenChangeSize = MyApp.isVideoReording;
 					MyApp.isVideoReording = false;
-					MyApp.shouldRecordNow = false;
 					resetRecordTimeText();
 					textRecordTime.setVisibility(View.INVISIBLE);
 					if (resolutionState == Constant.Record.STATE_RESOLUTION_1080P) {
@@ -1466,7 +1452,6 @@ public class MainActivity extends Activity implements TachographCallback,
 						resetRecordTimeText();
 						textRecordTime.setVisibility(View.INVISIBLE);
 						MyApp.isVideoReording = false;
-						MyApp.shouldRecordNow = false;
 						stopRecord();
 					}
 					if (muteState == Constant.Record.STATE_MUTE) {
@@ -2185,7 +2170,6 @@ public class MainActivity extends Activity implements TachographCallback,
 			if (stopRecorder() == 0) {
 				setRecordState(false);
 			}
-			MyApp.shouldRecordNow = true;
 			break;
 
 		case TachographCallback.ERROR_SAVE_IMAGE_FAIL:
