@@ -169,17 +169,37 @@ public class StorageUtil {
 				if (oldestUnlockVideoId != -1) {
 					String oldestUnlockVideoName = videoDb
 							.getVideNameById(oldestUnlockVideoId);
+					// File file = new File(Constant.Path.RECORD_FRONT
+					// + oldestUnlockVideoName.split("_")[0]
+					// + File.separator + oldestUnlockVideoName);
 					File file = new File(Constant.Path.RECORD_FRONT
-							+ oldestUnlockVideoName.split("_")[0]
-							+ File.separator + oldestUnlockVideoName);
-					if (file.exists() && file.isFile()) {
-						MyLog.d("[StorageUtil]Delete Old Unlock Video:"
-								+ file.getName());
-						int i = 0;
-						while (!file.delete() && i < 3) {
-							i++;
+							+ oldestUnlockVideoName);
+					if (file.isFile()) {
+						if (file.exists()) {
 							MyLog.d("[StorageUtil]Delete Old Unlock Video:"
-									+ file.getName() + " Filed!!! Try:" + i);
+									+ file.getName());
+							int i = 0;
+							while (!file.delete() && i < 3) {
+								i++;
+								MyLog.d("[StorageUtil]Delete Old Unlock Video:"
+										+ file.getName() + " Filed!!! Try:" + i);
+							}
+						} else { // 兼容旧方法：文件夹存储
+							file = new File(Constant.Path.RECORD_FRONT
+									+ oldestUnlockVideoName.split("_")[0]
+									+ File.separator + oldestUnlockVideoName);
+							if (file.exists()) {
+								MyLog.d("[StorageUtil]Delete Old Unlock Video:"
+										+ file.getName());
+								int i = 0;
+								while (!file.delete() && i < 3) {
+									i++;
+									MyLog.d("[StorageUtil]Delete Old Unlock Video:"
+											+ file.getName()
+											+ " Filed!!! Try:"
+											+ i);
+								}
+							}
 						}
 					}
 					videoDb.deleteDriveVideoById(oldestUnlockVideoId); // 删除数据库记录
@@ -208,14 +228,16 @@ public class StorageUtil {
 						HintUtil.showToast(context, strStorageFull);
 						String oldestVideoName = videoDb
 								.getVideNameById(oldestVideoId);
+						// File file = new File(Constant.Path.RECORD_FRONT
+						// + oldestVideoName.split("_")[0]
+						// + File.separator + oldestVideoName);
 						File file = new File(Constant.Path.RECORD_FRONT
-								+ oldestVideoName.split("_")[0]
 								+ File.separator + oldestVideoName);
 						if (file.exists() && file.isFile()) {
 							MyLog.d("[StorageUtil]Delete Old lock Video:"
 									+ file.getName());
 							int i = 0;
-							while (!file.delete() && i < 5) {
+							while (!file.delete() && i < 3) {
 								i++;
 								MyLog.d("[StorageUtil]Delete Old lock Video:"
 										+ file.getName() + " Filed!!! Try:" + i);

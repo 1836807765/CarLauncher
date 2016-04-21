@@ -2165,11 +2165,12 @@ public class MainActivity extends Activity implements TachographCallback,
 			HintUtil.showToast(MainActivity.this, strSaveVideoErr);
 			MyLog.e("Record Error : ERROR_SAVE_VIDEO_FAIL");
 			// 视频保存失败，原因：存储空间不足，清空文件夹，视频被删掉
-			resetRecordTimeText();
-			MyLog.v("[onError]stopRecorder()");
-			if (stopRecorder() == 0) {
-				setRecordState(false);
-			}
+			// FIXME
+			// resetRecordTimeText();
+			// MyLog.v("[onError]stopRecorder()");
+			// if (stopRecorder() == 0) {
+			// setRecordState(false);
+			// }
 			break;
 
 		case TachographCallback.ERROR_SAVE_IMAGE_FAIL:
@@ -2262,7 +2263,7 @@ public class MainActivity extends Activity implements TachographCallback,
 	@Override
 	public void onFileStart(int type, String path) {
 		if (type == 1) {
-			MyApp.nowRecordVideoName = path.split("/")[5];
+			MyApp.nowRecordVideoName = path.split("/")[4];
 		}
 	}
 
@@ -2302,6 +2303,7 @@ public class MainActivity extends Activity implements TachographCallback,
 	 * 
 	 * @param path
 	 *            视频：/mnt/sdcard/tachograph/2015-07-01/2015-07-01_105536.mp4
+	 *            新库：/mnt/sdcard/tachograph/2016-04-21_110636.mp4
 	 *            图片:/mnt/sdcard/tachograph/camera_shot/2015-07-01_105536.jpg
 	 */
 	@Override
@@ -2313,7 +2315,7 @@ public class MainActivity extends Activity implements TachographCallback,
 				releaseStorageWhenFileSaveHandler
 						.sendMessage(messageDeleteUnlockVideo);
 
-				String videoName = path.split("/")[5];
+				String videoName = path.split("/")[4]; // 5
 				int videoResolution = (resolutionState == Constant.Record.STATE_RESOLUTION_720P) ? 720
 						: 1080;
 				int videoLock = 0;

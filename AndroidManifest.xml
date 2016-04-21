@@ -3,8 +3,8 @@
     coreApp="true"
     package="com.tchip.carlauncher"
     android:sharedUserId="android.uid.system"
-    android:versionCode="2"
-    android:versionName="2016.04.19-09:50" >
+    android:versionCode="3"
+    android:versionName="2016.04.21-11:20" >
 
     <uses-sdk
         android:minSdkVersion="19"
