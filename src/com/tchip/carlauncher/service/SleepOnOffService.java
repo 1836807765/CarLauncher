@@ -1,15 +1,10 @@
 package com.tchip.carlauncher.service;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.util.StringTokenizer;
-
 import cn.kuwo.autosdk.api.KWAPI;
 
 import com.tchip.carlauncher.Constant;
 import com.tchip.carlauncher.MyApp;
+import com.tchip.carlauncher.model.TimeTickReceiver;
 import com.tchip.carlauncher.util.MyLog;
 import com.tchip.carlauncher.util.SettingUtil;
 
@@ -28,7 +23,6 @@ import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
 import android.provider.Settings;
 import android.view.KeyEvent;
-import android.widget.Toast;
 
 public class SleepOnOffService extends Service {
 	private Context context;
@@ -54,6 +48,8 @@ public class SleepOnOffService extends Service {
 
 	/** ACC断开进入深度休眠之前的时间:秒 **/
 	private final int TIME_SLEEP_GOING = 85;
+
+	private TimeTickReceiver timeTickReceiver;
 
 	@Override
 	public IBinder onBind(Intent intent) {
@@ -83,6 +79,29 @@ public class SleepOnOffService extends Service {
 		filter.addAction(Constant.Broadcast.SETTING_SYNC);
 		filter.addAction(Constant.Broadcast.MEDIA_FORMAT);
 		registerReceiver(sleepOnOffReceiver, filter);
+	}
+
+	@Override
+	public int onStartCommand(Intent intent, int flags, int startId) {
+
+		timeTickReceiver = new TimeTickReceiver();
+		IntentFilter timeTickfilter = new IntentFilter(Intent.ACTION_TIME_TICK);
+		registerReceiver(timeTickReceiver, timeTickfilter);
+
+		return super.onStartCommand(intent, flags, startId);
+	}
+
+	@Override
+	public void onDestroy() {
+		if (sleepOnOffReceiver != null) {
+			unregisterReceiver(sleepOnOffReceiver);
+		}
+
+		if (timeTickReceiver != null) {
+			unregisterReceiver(timeTickReceiver);
+		}
+
+		super.onDestroy();
 	}
 
 	/**
@@ -140,7 +159,7 @@ public class SleepOnOffService extends Service {
 							+ MyApp.shouldStopWhenCrashVideoSave);
 
 					if (MyApp.shouldStopWhenCrashVideoSave) {
-						if(!MyApp.shouldCrashRecord && !MyApp.isVideoReording){
+						if (!MyApp.shouldCrashRecord && !MyApp.isVideoReording) {
 							MyApp.shouldCrashRecord = true;
 							MyApp.shouldStopWhenCrashVideoSave = true;
 						}
@@ -402,7 +421,7 @@ public class SleepOnOffService extends Service {
 		SettingUtil.setEDogEnable(false); // 关闭电子狗电源
 
 		// 关闭FM发射，并保存休眠前状态
-		boolean fmStateBeforeSleep = SettingUtil.isFmTransmitOn(context);
+		boolean fmStateBeforeSleep = SettingUtil.isFmTransmitOnSetting(context);
 		editor.putBoolean("fmStateBeforeSleep", fmStateBeforeSleep);
 		editor.commit();
 		if (fmStateBeforeSleep) {
@@ -473,12 +492,6 @@ public class SleepOnOffService extends Service {
 	 */
 	private void startExternalService() {
 		try {
-			// 天气播报(整点报时)
-			Intent intentWeather = new Intent();
-			intentWeather.setClassName("com.tchip.weather",
-					"com.tchip.weather.service.TimeTickService");
-			startService(intentWeather);
-
 			// 碰撞侦测服务
 			Intent intentCrash = new Intent(context, SensorWatchService.class);
 			startService(intentCrash);
@@ -512,12 +525,6 @@ public class SleepOnOffService extends Service {
 	 */
 	private void stopExternalService() {
 		try {
-			// 天气播报(整点报时)
-			Intent intentWeather = new Intent();
-			intentWeather.setClassName("com.tchip.weather",
-					"com.tchip.weather.service.TimeTickService");
-			stopService(intentWeather);
-
 			// 碰撞侦测服务
 			Intent intentCrash = new Intent(context, SensorWatchService.class);
 			stopService(intentCrash);
@@ -531,86 +538,10 @@ public class SleepOnOffService extends Service {
 					"com.autonavi.minimap" // 高德地图
 			};
 			SettingUtil.killApp(context, arrayKillApp);
-			// killProcess("com.hdsc.monitor.heart.monitorvoice");
-			// killProcess1("com.hdsc.monitor.heart.monitorvoice");
 
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-	}
-
-	private Process process;
-
-	private void killProcess(String packageName) {
-		if (process == null)
-			try {
-				process = Runtime.getRuntime().exec("su");
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		OutputStream out = process.getOutputStream();
-		String cmd = "am force-stop " + packageName + " \n";
-		try {
-			out.write(cmd.getBytes());
-			out.flush();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-
-	private void killProcess1(String packageName) {
-		MyLog.i("killProcess");
-		java.lang.Process process = null;
-		try {
-			String processId = "";
-			process = Runtime.getRuntime().exec("su");
-			OutputStream os = process.getOutputStream();
-			os.write("ps \n".getBytes());
-			os.flush();
-			BufferedReader br = new BufferedReader(new InputStreamReader(
-					process.getInputStream()));
-			String inline;
-			while ((inline = br.readLine()) != null) {
-				if (inline.contains(packageName)) {
-					MyLog.i("" + inline);
-					StringTokenizer processInfoTokenizer = new StringTokenizer(
-							inline);
-					int count = 0;
-					while (processInfoTokenizer.hasMoreTokens()) {
-						count++;
-						processId = processInfoTokenizer.nextToken();
-						if (count == 2) {
-							break;
-						}
-					}
-					MyLog.i("kill process : " + processId);
-					os.write(("kill " + processId).getBytes());
-					os.flush();
-					if (os != null) {
-						os.close();
-						os = null;
-					}
-					br.close();
-					return;
-				}
-			}
-		} catch (IOException ex) {
-			MyLog.e("" + ex.getStackTrace());
-		} finally {
-			if (process != null) {
-				process.destroy();
-				process = null;
-			}
-		}
-	}
-
-	@Override
-	public void onDestroy() {
-		if (sleepOnOffReceiver != null) {
-			unregisterReceiver(sleepOnOffReceiver);
-		}
-
-		super.onDestroy();
 	}
 
 }

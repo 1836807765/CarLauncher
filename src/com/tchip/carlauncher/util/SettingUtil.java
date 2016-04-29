@@ -145,7 +145,7 @@ public class SettingUtil {
 	public static File nodeFmChannel = new File(
 			"/sys/devices/platform/mt-i2c.1/i2c-1/1-002c/setch_qn8027");
 
-	public static boolean isFmTransmitOn(Context context) {
+	public static boolean isFmTransmitOnSetting(Context context) {
 		boolean isFmTransmitOpen = false;
 		String fmEnable = Settings.System.getString(
 				context.getContentResolver(),
@@ -340,17 +340,25 @@ public class SettingUtil {
 
 		// 1.启动时初始化FM发射频率节点,频率范围：7600~10800:8750-10800
 		try {
-			int freq = SettingUtil.getFmFrequceny(context);
+			int freq = getFmFrequceny(context);
 			if (freq >= 8750 && freq <= 10800)
-				SettingUtil.setFmFrequency(context, freq);
+				setFmFrequency(context, freq);
 			else
-				SettingUtil.setFmFrequency(context, 8750);
+				setFmFrequency(context, 8750);
 
-			boolean isFmOn = SettingUtil.isFmTransmitOn(context);
+			boolean isFmOn = isFmTransmitOnSetting(context);
 			Settings.System.putString(context.getContentResolver(),
 					Constant.FMTransmit.SETTING_ENABLE, isFmOn ? "1" : "0");
-			SettingUtil.SaveFileToNode(SettingUtil.nodeFmEnable, isFmOn ? "1"
-					: "0");
+			String nodeFmEnableStr = "" + getFileInt(nodeFmEnable);
+			if (isFmOn) {
+				if ("0".equals(nodeFmEnableStr)) {
+					SaveFileToNode(nodeFmEnable, "1");
+				}
+			} else {
+				if ("1".equals(nodeFmEnableStr)) {
+					SaveFileToNode(nodeFmEnable, "0");
+				}
+			}
 			context.sendBroadcast(new Intent(
 					isFmOn ? "com.tchip.FM_OPEN_CARLAUNCHER"
 							: "com.tchip.FM_CLOSE_CARLAUNCHER")); // 通知状态栏同步图标
@@ -363,7 +371,7 @@ public class SettingUtil {
 		try {
 			boolean autoScreenLight = sharedPreferences.getBoolean(
 					"autoScreenLight", Constant.Setting.AUTO_BRIGHT_DEFAULT_ON);
-			SettingUtil.setAutoLight(context, autoScreenLight);
+			setAutoLight(context, autoScreenLight);
 		} catch (Exception e) {
 			MyLog.e("[SettingUtil]initialAutoLight: Catch Exception!");
 		}
@@ -372,7 +380,7 @@ public class SettingUtil {
 		try {
 			boolean isParkingMonitorOn = sharedPreferences.getBoolean(
 					"parkingOn", Constant.Record.parkDefaultOn);
-			SettingUtil.setParkingMonitor(context, isParkingMonitorOn);
+			setParkingMonitor(context, isParkingMonitorOn);
 		} catch (Exception e) {
 			MyLog.e("[SettingUtil]initialParkingMonitor: Catch Exception!");
 		}

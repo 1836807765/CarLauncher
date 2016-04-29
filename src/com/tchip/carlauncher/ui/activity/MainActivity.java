@@ -2,6 +2,8 @@ package com.tchip.carlauncher.ui.activity;
 
 import java.io.File;
 
+import cn.kuwo.autosdk.api.KWAPI;
+
 import com.tchip.carlauncher.Constant;
 import com.tchip.carlauncher.Constant.Module;
 import com.tchip.carlauncher.MyApp;
@@ -69,24 +71,16 @@ public class MainActivity extends Activity implements TachographCallback,
 
 	private Context context;
 
-	/** onFileSave时释放空间 */
-	private static final HandlerThread fileSaveHandlerThread = new HandlerThread(
-			"filesave-thread");
+	/** 任务非UI线程 */
+	private static final HandlerThread taskHandlerThread = new HandlerThread(
+			"task-thread");
 	static {
-		fileSaveHandlerThread.start();
+		taskHandlerThread.start();
 	}
-	private final Handler releaseStorageWhenFileSaveHandler = new ReleaseStorageWhenFileSaveHandler(
-			fileSaveHandlerThread.getLooper());
-	private Handler mMainHandler; // 主线程Handler
+	private final Handler taskHandler = new TaskHandler(
+			taskHandlerThread.getLooper());
 
-	/** startRecord时释放空间 */
-	private static final HandlerThread startRecordHandlerThread = new HandlerThread(
-			"startrecord-thread");
-	static {
-		startRecordHandlerThread.start();
-	}
-	private final Handler releaseStorageWhenStartRecordHandler = new ReleaseStorageWhenStartRecordHandler(
-			startRecordHandlerThread.getLooper());
+	private Handler mMainHandler; // 主线程Handler
 
 	private SharedPreferences sharedPreferences;
 	private Editor editor;
@@ -108,8 +102,6 @@ public class MainActivity extends Activity implements TachographCallback,
 	private ImageView imageCameraSwitch;
 	/** 前后摄像头切换 */
 	private LinearLayout layoutCameraSwitch;
-	/** WiFi状态监听器 */
-	// private IntentFilter wifiIntentFilter;
 	/** WiFi状态图标 */
 	private ImageView imageWifiLevel;
 	private ImageView imageSignalLevel, image3GType;
@@ -181,15 +173,14 @@ public class MainActivity extends Activity implements TachographCallback,
 		wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
 		connectivityManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
 
-		networkStateReceiver = new NetworkStateReceiver();
-		IntentFilter networkFilter = new IntentFilter();
-		networkFilter.addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED);
-		networkFilter.addAction(Constant.Broadcast.BT_CONNECTED);
-		networkFilter.addAction(Constant.Broadcast.BT_DISCONNECTED);
-		registerReceiver(networkStateReceiver, networkFilter);
+		mainReceiver = new MainReceiver();
+		IntentFilter mainFilter = new IntentFilter();
+		mainFilter.addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED);
+		mainFilter.addAction(Constant.Broadcast.BT_CONNECTED);
+		mainFilter.addAction(Constant.Broadcast.BT_DISCONNECTED);
+		registerReceiver(mainReceiver, mainFilter);
 
 		initialLayout();
-		SettingUtil.initialNodeState(MainActivity.this);
 		StorageUtil.createRecordDirectory();
 		setupRecordDefaults();
 		setupRecordViews();
@@ -210,10 +201,9 @@ public class MainActivity extends Activity implements TachographCallback,
 			MyApp.isSleeping = true; // ACC未连接,进入休眠
 			MyLog.v("[Main]ACC Check:OFF, Send Broadcast:com.tchip.SLEEP_ON.");
 
-			sendBroadcast(new Intent(Constant.Broadcast.SLEEP_ON)); // 通知其他应用进入休眠
-			SettingUtil.setAirplaneMode(MainActivity.this, true); // 打开飞行模式
-			SettingUtil.setGpsState(MainActivity.this, false); // 关闭GPS
-			SettingUtil.setEDogEnable(false); // 关闭电子狗电源
+			Message msgAccOff = new Message();
+			msgAccOff.what = 4;
+			taskHandler.sendMessage(msgAccOff);
 		}
 		new Thread(new BackThread()).start(); // 后台线程
 	}
@@ -237,17 +227,15 @@ public class MainActivity extends Activity implements TachographCallback,
 	protected void onResume() {
 		MyLog.v("[Main]onResume");
 		MyApp.isMainForeground = true;
+
+		Message messageOnResume = new Message();
+		messageOnResume.what = 3;
+		taskHandler.sendMessage(messageOnResume);
+
 		try {
 			hsvMain.scrollTo(0, 0); // 按HOME键返回第一个图标
 			setSurfaceLarge(false); // 按HOME键将预览区域还原为小窗口
 
-			setBluetoothIcon(NetworkUtil
-					.isExtBluetoothOn(getApplicationContext()) ? 0 : -1); // 外置蓝牙
-
-			if (!MyApp.isBTPlayMusic) { // 蓝牙播放音乐时不设置触摸声音
-				Settings.System.putString(getContentResolver(),
-						Settings.System.SOUND_EFFECTS_ENABLED, "1");
-			}
 			if (!MyApp.isFirstLaunch) {
 				if (!MyApp.isVideoReording || MyApp.shouldResetRecordWhenResume) {
 					MyApp.shouldResetRecordWhenResume = false;
@@ -288,13 +276,100 @@ public class MainActivity extends Activity implements TachographCallback,
 		MyLog.v("[Main]onDestroy");
 		release(); // 释放录像区域
 		videoDb.close();
+
+		if (mainReceiver != null) {
+			unregisterReceiver(mainReceiver);
+		}
+
 		super.onDestroy();
 	}
 
-	private NetworkStateReceiver networkStateReceiver;
+	class TaskHandler extends Handler {
+
+		public TaskHandler(Looper looper) {
+			super(looper);
+		}
+
+		@Override
+		public void handleMessage(Message msg) {
+			switch (msg.what) {
+			case 1: // 保存文件时释放空间
+				this.removeMessages(1);
+				boolean isDeleteSuccessWhenFileSave = StorageUtil
+						.releaseRecordStorage(context);
+				mMainHandler.post(new Runnable() {
+
+					@Override
+					public void run() {
+						// main thread
+
+					}
+				});
+				this.removeMessages(1);
+				break;
+
+			case 2: // 开始录像时释放空间
+				this.removeMessages(2);
+				final boolean isDeleteSuccessWhenStartRecord = StorageUtil
+						.releaseRecordStorage(context);
+				mMainHandler.post(new Runnable() {
+
+					@Override
+					public void run() {
+						if (isDeleteSuccessWhenStartRecord) {
+							HintUtil.playAudio(getApplicationContext(),
+									FILE_TYPE_VIDEO);
+							if (carRecorder.start() == 0) {
+								setRecordState(true);
+							}
+						}
+
+					}
+				});
+				this.removeMessages(2);
+				break;
+
+			case 3: // onResume任务
+				this.removeMessages(3);
+				SettingUtil.initialNodeState(MainActivity.this);
+				if (!MyApp.isBTPlayMusic) { // 蓝牙播放音乐时不设置触摸声音
+					Settings.System.putString(getContentResolver(),
+							Settings.System.SOUND_EFFECTS_ENABLED, "1");
+				}
+				this.removeMessages(3);
+				break;
+
+			case 4: // 开机发现ACC不在
+				this.removeMessages(4);
+				sendBroadcast(new Intent(Constant.Broadcast.SLEEP_ON)); // 通知其他应用进入休眠
+				SettingUtil.setAirplaneMode(MainActivity.this, true); // 打开飞行模式
+				SettingUtil.setGpsState(MainActivity.this, false); // 关闭GPS
+				SettingUtil.setEDogEnable(false); // 关闭电子狗电源
+
+				// 关闭碰撞侦测服务
+				Intent intentCrash = new Intent(context,
+						SensorWatchService.class);
+				stopService(intentCrash);
+
+				String[] arrayKillApp = { "cn.kuwo.kwmusiccar", // 酷我音乐
+						"com.android.gallery3d", // 图库
+						"com.autonavi.amapauto", // 高德地图（车机版）
+						"com.hdsc.monitor.heart.monitorvoice", // 善领云中心
+						"com.ximalaya.ting.android.car", // 喜马拉雅（车机版）
+						"com.autonavi.minimap" // 高德地图
+				};
+				SettingUtil.killApp(context, arrayKillApp);
+				this.removeMessages(4);
+				break;
+			}
+		}
+
+	}
+
+	private MainReceiver mainReceiver;
 
 	/** 监听飞行模式，外置蓝牙广播 */
-	private class NetworkStateReceiver extends BroadcastReceiver {
+	private class MainReceiver extends BroadcastReceiver {
 
 		@Override
 		public void onReceive(Context context, Intent intent) {
@@ -787,20 +862,11 @@ public class MainActivity extends Activity implements TachographCallback,
 	 * 初始化服务:
 	 * 
 	 * 1.碰撞侦测服务
-	 * 
-	 * 2.轨迹记录服务
-	 * 
-	 * 3.天气播报服务
 	 */
 	private void initialService() {
 		// 碰撞侦测服务
 		Intent intentSensor = new Intent(this, SensorWatchService.class);
 		startService(intentSensor);
-		// 天气播报(整点报时)
-		Intent intentWeather = new Intent();
-		intentWeather.setClassName("com.tchip.weather",
-				"com.tchip.weather.service.TimeTickService");
-		startService(intentWeather);
 	}
 
 	private void initialCameraSurface() {
@@ -2193,40 +2259,6 @@ public class MainActivity extends Activity implements TachographCallback,
 		}
 	}
 
-	class ReleaseStorageWhenStartRecordHandler extends Handler {
-
-		public ReleaseStorageWhenStartRecordHandler(Looper looper) {
-			super(looper);
-		}
-
-		@Override
-		public void handleMessage(Message msg) {
-			switch (msg.what) {
-			case 1:
-				this.removeMessages(1);
-				final boolean isDeleteSuccess = StorageUtil
-						.releaseRecordStorage(context);
-				mMainHandler.post(new Runnable() {
-
-					@Override
-					public void run() {
-						if (isDeleteSuccess) {
-							HintUtil.playAudio(getApplicationContext(),
-									FILE_TYPE_VIDEO);
-							if (carRecorder.start() == 0) {
-								setRecordState(true);
-							}
-						}
-
-					}
-				});
-				this.removeMessages(1);
-				break;
-			}
-		}
-
-	}
-
 	/**
 	 * 开启录像
 	 * 
@@ -2246,9 +2278,8 @@ public class MainActivity extends Activity implements TachographCallback,
 			resetRecordTimeText();
 
 			Message messageReleaseWhenStartRecord = new Message();
-			messageReleaseWhenStartRecord.what = 1;
-			releaseStorageWhenStartRecordHandler
-					.sendMessage(messageReleaseWhenStartRecord);
+			messageReleaseWhenStartRecord.what = 2;
+			taskHandler.sendMessage(messageReleaseWhenStartRecord);
 			if (!StorageUtil.isStorageLess()) {
 				return 0;
 			} else {
@@ -2265,34 +2296,6 @@ public class MainActivity extends Activity implements TachographCallback,
 		if (type == 1) {
 			MyApp.nowRecordVideoName = path.split("/")[4];
 		}
-	}
-
-	class ReleaseStorageWhenFileSaveHandler extends Handler {
-
-		public ReleaseStorageWhenFileSaveHandler(Looper looper) {
-			super(looper);
-		}
-
-		@Override
-		public void handleMessage(Message msg) {
-			switch (msg.what) {
-			case 1:
-				this.removeMessages(1);
-				boolean isDeleteSuccess = StorageUtil
-						.releaseRecordStorage(context);
-				mMainHandler.post(new Runnable() {
-
-					@Override
-					public void run() {
-						// main thread
-
-					}
-				});
-				this.removeMessages(1);
-				break;
-			}
-		}
-
 	}
 
 	/**
@@ -2312,8 +2315,7 @@ public class MainActivity extends Activity implements TachographCallback,
 			if (type == 1) { // 视频
 				Message messageDeleteUnlockVideo = new Message();
 				messageDeleteUnlockVideo.what = 1;
-				releaseStorageWhenFileSaveHandler
-						.sendMessage(messageDeleteUnlockVideo);
+				taskHandler.sendMessage(messageDeleteUnlockVideo);
 
 				String videoName = path.split("/")[4]; // 5
 				int videoResolution = (resolutionState == Constant.Record.STATE_RESOLUTION_720P) ? 720
