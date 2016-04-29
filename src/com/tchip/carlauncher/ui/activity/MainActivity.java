@@ -1,6 +1,7 @@
 package com.tchip.carlauncher.ui.activity;
 
 import java.io.File;
+import java.util.Calendar;
 
 import cn.kuwo.autosdk.api.KWAPI;
 
@@ -13,7 +14,6 @@ import com.tchip.carlauncher.model.DriveVideo;
 import com.tchip.carlauncher.model.DriveVideoDbHelper;
 import com.tchip.carlauncher.model.Typefaces;
 import com.tchip.carlauncher.service.SensorWatchService;
-import com.tchip.carlauncher.service.SleepOnOffService;
 import com.tchip.carlauncher.util.HintUtil;
 import com.tchip.carlauncher.util.ClickUtil;
 import com.tchip.carlauncher.util.DateUtil;
@@ -48,6 +48,7 @@ import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
 import android.os.PowerManager;
+import android.os.PowerManager.WakeLock;
 import android.provider.Settings;
 import android.telephony.PhoneStateListener;
 import android.telephony.SignalStrength;
@@ -70,17 +71,26 @@ public class MainActivity extends Activity implements TachographCallback,
 		Callback {
 
 	private Context context;
+	/** UI主线程Handler */
+	private Handler mMainHandler;
 
-	/** 任务非UI线程 */
-	private static final HandlerThread taskHandlerThread = new HandlerThread(
-			"task-thread");
+	/** 非UI线程1：任务 */
+	private static final HandlerThread costHandlerThread = new HandlerThread(
+			"cost-thread");
 	static {
-		taskHandlerThread.start();
+		costHandlerThread.start();
 	}
-	private final Handler taskHandler = new TaskHandler(
-			taskHandlerThread.getLooper());
+	private final Handler costHandler = new CostHandler(
+			costHandlerThread.getLooper());
 
-	private Handler mMainHandler; // 主线程Handler
+	/** 非UI线程2：及时，适用不阻塞操作 */
+	private static final HandlerThread nowHandlerThread = new HandlerThread(
+			"now-thread");
+	static {
+		nowHandlerThread.start();
+	}
+	private final Handler nowHandler = new NowHandler(
+			nowHandlerThread.getLooper());
 
 	private SharedPreferences sharedPreferences;
 	private Editor editor;
@@ -145,6 +155,27 @@ public class MainActivity extends Activity implements TachographCallback,
 	private NetworkInfo networkInfoWifi;
 	private PowerManager powerManager;
 
+	// below is SleepOnOffService
+	private WakeLock wakeLock;
+
+	/** ACC断开进入预备模式的时间:秒 **/
+	private int preSleepCount = 0;
+
+	/** 预备睡眠模式的时间:秒 **/
+	private final int TIME_SLEEP_CONFIRM = 2;
+
+	/** ACC连接进入预备模式的时间:秒 **/
+	private int preWakeCount = 0;
+
+	/** 预备唤醒模式的时间:秒 **/
+	private final int TIME_WAKE_CONFIRM = 1;
+
+	/** ACC断开的时间:秒 **/
+	private int accOffCount = 0;
+
+	/** ACC断开进入深度休眠之前的时间:秒 **/
+	private final int TIME_SLEEP_GOING = 85;
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -176,8 +207,17 @@ public class MainActivity extends Activity implements TachographCallback,
 		mainReceiver = new MainReceiver();
 		IntentFilter mainFilter = new IntentFilter();
 		mainFilter.addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED);
+		mainFilter.addAction(Constant.Broadcast.ACC_ON);
+		mainFilter.addAction(Constant.Broadcast.ACC_OFF);
 		mainFilter.addAction(Constant.Broadcast.BT_CONNECTED);
 		mainFilter.addAction(Constant.Broadcast.BT_DISCONNECTED);
+		mainFilter.addAction(Constant.Broadcast.BT_MUSIC_PLAYING);
+		mainFilter.addAction(Constant.Broadcast.BT_MUSIC_STOPED);
+		mainFilter.addAction(Constant.Broadcast.GSENSOR_CRASH);
+		mainFilter.addAction(Constant.Broadcast.SPEECH_COMMAND);
+		mainFilter.addAction(Constant.Broadcast.SETTING_SYNC);
+		mainFilter.addAction(Constant.Broadcast.MEDIA_FORMAT);
+		mainFilter.addAction(Intent.ACTION_TIME_TICK);
 		registerReceiver(mainReceiver, mainFilter);
 
 		initialLayout();
@@ -185,16 +225,11 @@ public class MainActivity extends Activity implements TachographCallback,
 		setupRecordDefaults();
 		setupRecordViews();
 
-		SettingUtil.setGpsState(MainActivity.this, true); // 打开GPS
-		// ACC上下电侦测服务
-		Intent intentSleepOnOff = new Intent(MainActivity.this,
-				SleepOnOffService.class);
-		startService(intentSleepOnOff);
-
 		// 首次启动是否需要自动录像
 		if (1 == SettingUtil.getAccStatus()) {
 			MyApp.isAccOn = true; // 同步ACC状态
 			SettingUtil.setAirplaneMode(MainActivity.this, false); // 关闭飞行模式
+			SettingUtil.setGpsState(MainActivity.this, true); // 打开GPS
 			new Thread(new AutoThread()).start(); // 序列任务线程
 		} else {
 			MyApp.isAccOn = false; // 同步ACC状态
@@ -203,7 +238,7 @@ public class MainActivity extends Activity implements TachographCallback,
 
 			Message msgAccOff = new Message();
 			msgAccOff.what = 4;
-			taskHandler.sendMessage(msgAccOff);
+			costHandler.sendMessage(msgAccOff);
 		}
 		new Thread(new BackThread()).start(); // 后台线程
 	}
@@ -230,7 +265,7 @@ public class MainActivity extends Activity implements TachographCallback,
 
 		Message messageOnResume = new Message();
 		messageOnResume.what = 3;
-		taskHandler.sendMessage(messageOnResume);
+		costHandler.sendMessage(messageOnResume);
 
 		try {
 			hsvMain.scrollTo(0, 0); // 按HOME键返回第一个图标
@@ -280,13 +315,13 @@ public class MainActivity extends Activity implements TachographCallback,
 		if (mainReceiver != null) {
 			unregisterReceiver(mainReceiver);
 		}
-
 		super.onDestroy();
 	}
 
-	class TaskHandler extends Handler {
+	/** 适用：耗时操作 */
+	class CostHandler extends Handler {
 
-		public TaskHandler(Looper looper) {
+		public CostHandler(Looper looper) {
 			super(looper);
 		}
 
@@ -323,7 +358,6 @@ public class MainActivity extends Activity implements TachographCallback,
 								setRecordState(true);
 							}
 						}
-
 					}
 				});
 				this.removeMessages(2);
@@ -343,27 +377,69 @@ public class MainActivity extends Activity implements TachographCallback,
 				this.removeMessages(4);
 				sendBroadcast(new Intent(Constant.Broadcast.SLEEP_ON)); // 通知其他应用进入休眠
 				SettingUtil.setAirplaneMode(MainActivity.this, true); // 打开飞行模式
-				SettingUtil.setGpsState(MainActivity.this, false); // 关闭GPS
-				SettingUtil.setEDogEnable(false); // 关闭电子狗电源
-
-				// 关闭碰撞侦测服务
-				Intent intentCrash = new Intent(context,
-						SensorWatchService.class);
-				stopService(intentCrash);
-
-				String[] arrayKillApp = { "cn.kuwo.kwmusiccar", // 酷我音乐
-						"com.android.gallery3d", // 图库
-						"com.autonavi.amapauto", // 高德地图（车机版）
-						"com.hdsc.monitor.heart.monitorvoice", // 善领云中心
-						"com.ximalaya.ting.android.car", // 喜马拉雅（车机版）
-						"com.autonavi.minimap" // 高德地图
-				};
-				SettingUtil.killApp(context, arrayKillApp);
+				stopExternalService();
 				this.removeMessages(4);
+				break;
+
+			case 5: // 写入图片EXIF信息
+				this.removeMessages(5);
+				StorageUtil.writeImageExif();
+				this.removeMessages(5);
+				break;
+
+			case 6: // 检查错误视频信息
+				this.removeMessages(6);
+				File file = new File(Constant.Path.RECORD_FRONT);
+				StorageUtil.RecursionCheckFile(MainActivity.this, file);
+				this.removeMessages(6);
 				break;
 			}
 		}
 
+	}
+
+	/** 适用：不耗时，不阻塞操作 */
+	class NowHandler extends Handler {
+
+		public NowHandler(Looper looper) {
+			super(looper);
+		}
+
+		@Override
+		public void handleMessage(Message msg) {
+			switch (msg.what) {
+			case 1: // 接收到ACC_ON广播
+				if (!this.hasMessages(2)) {
+					// this.removeMessages(1);
+					MyApp.isAccOn = true;
+					MyApp.isAccOffPhotoTaking = false; // 重置ACC下电拍照标志
+					preSleepCount = 0;
+					MyApp.isSleepConfirm = false;
+					preWakeCount = 0;
+					MyApp.isWakeConfirm = true;
+					new Thread(new PreWakeThread()).start();
+					// this.removeMessages(1);
+				}
+				break;
+
+			case 2: // 接收到ACC_OFF广播
+				if (!this.hasMessages(1)) {
+					// this.removeMessages(2);
+					MyApp.isAccOn = false;
+					preSleepCount = 0;
+					MyApp.isSleepConfirm = true;
+					preWakeCount = 0;
+					MyApp.isWakeConfirm = false;
+					new Thread(new PreSleepThread()).start();
+					// this.removeMessages(2);
+				}
+				break;
+
+			default:
+				break;
+			}
+			super.handleMessage(msg);
+		}
 	}
 
 	private MainReceiver mainReceiver;
@@ -374,14 +450,417 @@ public class MainActivity extends Activity implements TachographCallback,
 		@Override
 		public void onReceive(Context context, Intent intent) {
 			String action = intent.getAction();
-			if (action.equals(Intent.ACTION_AIRPLANE_MODE_CHANGED)) {
+			if (Intent.ACTION_AIRPLANE_MODE_CHANGED.equals(action)) {
 				setAirplaneIcon(intent.getBooleanExtra("state", false));
-			} else if (action.equals(Constant.Broadcast.BT_CONNECTED)) {
+			} else if (Constant.Broadcast.BT_CONNECTED.equals(action)) {
 				setBluetoothIcon(1);
-			} else if (action.equals(Constant.Broadcast.BT_DISCONNECTED)) {
+			} else if (Constant.Broadcast.BT_DISCONNECTED.equals(action)) {
 				setBluetoothIcon(0);
+			} else if (Constant.Broadcast.ACC_OFF.equals(action)) {
+				Message msgReceiveAccOff = new Message();
+				msgReceiveAccOff.what = 2;
+				nowHandler.sendMessage(msgReceiveAccOff);
+			} else if (Constant.Broadcast.ACC_ON.equals(action)) {
+				Message msgReceiveAccOn = new Message();
+				msgReceiveAccOn.what = 1;
+				nowHandler.sendMessage(msgReceiveAccOn);
+			} else if (Constant.Broadcast.GSENSOR_CRASH.equals(action)) { // 停车守卫:侦测到碰撞广播触发
+				if (MyApp.isSleeping) {
+					MyLog.v("[GSENSOR_CRASH]Before State->shouldCrashRecord:"
+							+ MyApp.shouldCrashRecord
+							+ ",shouldStopWhenCrashVideoSave:"
+							+ MyApp.shouldStopWhenCrashVideoSave);
+
+					if (MyApp.shouldStopWhenCrashVideoSave) {
+						if (!MyApp.shouldCrashRecord && !MyApp.isVideoReording) {
+							MyApp.shouldCrashRecord = true;
+							MyApp.shouldStopWhenCrashVideoSave = true;
+						}
+					} else {
+						MyApp.shouldCrashRecord = true;
+						MyApp.shouldStopWhenCrashVideoSave = true;
+					}
+				}
+			} else if (Constant.Broadcast.SPEECH_COMMAND.equals(action)) {
+				String command = intent.getExtras().getString("command");
+				if ("take_photo".equals(command)) {
+					MyApp.shouldTakeVoicePhoto = true; // 语音拍照
+
+					sendKeyCode(KeyEvent.KEYCODE_HOME); // 发送Home键，回到主界面
+					if (!powerManager.isScreenOn()) { // 确保屏幕点亮
+						SettingUtil.lightScreen(getApplicationContext());
+					}
+				} else if ("take_photo_wenxin".equals(command)) {
+					MyApp.shouldTakeVoicePhoto = true; // 语音拍照
+
+					sendKeyCode(KeyEvent.KEYCODE_HOME); // 发送Home键，回到主界面
+					if (!powerManager.isScreenOn()) { // 确保屏幕点亮
+						SettingUtil.lightScreen(getApplicationContext());
+					}
+				} else if ("open_dvr".equals(command)) {
+					if (MyApp.isAccOn && !MyApp.isVideoReording) {
+						MyApp.shouldMountRecord = true;
+					}
+					sendKeyCode(KeyEvent.KEYCODE_HOME);
+					MyApp.shouldOpenRecordFullScreen = true;
+					MyApp.shouldCloseRecordFullScreen = false;
+
+				} else if ("close_dvr".equals(command)) {
+					if (MyApp.isVideoReording) {
+						MyApp.shouldStopRecordFromVoice = true;
+					}
+					MyApp.shouldCloseRecordFullScreen = true;
+					MyApp.shouldOpenRecordFullScreen = false;
+				}
+			} else if (Constant.Broadcast.BT_MUSIC_PLAYING.equals(action)) {
+				MyApp.isBTPlayMusic = true;
+			} else if (Constant.Broadcast.BT_MUSIC_STOPED.equals(action)) {
+				MyApp.isBTPlayMusic = false;
+			} else if (Constant.Broadcast.SETTING_SYNC.equals(action)) {
+				String content = intent.getExtras().getString("content");
+				if ("parkOn".equals(content)) { // 停车守卫:开
+					editor.putBoolean(Constant.MySP.STR_PARKING_ON, true);
+					editor.commit();
+				} else if ("parkOff".equals(content)) { // 停车守卫:关
+					editor.putBoolean(Constant.MySP.STR_PARKING_ON, false);
+					editor.commit();
+				} else if ("crashOn".equals(content)) { // 碰撞侦测:开
+					editor.putBoolean("crashOn", true);
+					editor.commit();
+				} else if ("crashOff".equals(content)) { // 碰撞侦测:关
+					editor.putBoolean("crashOn", false);
+					editor.commit();
+				} else if ("crashLow".equals(content)) { // 碰撞侦测灵敏度:低
+					MyApp.crashSensitive = 0;
+					editor.putInt("crashSensitive", 0);
+					editor.commit();
+				} else if ("crashMiddle".equals(content)) { // 碰撞侦测灵敏度:中
+					MyApp.crashSensitive = 1;
+					editor.putInt("crashSensitive", 1);
+					editor.commit();
+				} else if ("crashHigh".equals(content)) { // 碰撞侦测灵敏度:高
+					MyApp.crashSensitive = 2;
+					editor.putInt("crashSensitive", 2);
+					editor.commit();
+				}
+			} else if (Constant.Broadcast.MEDIA_FORMAT.equals(action)) {
+				String path = intent.getExtras().getString("path");
+				MyLog.e("SleepOnOffReceiver: MEDIA_FORMAT !! Path:" + path);
+				if ("/storage/sdcard2".equals(path)) {
+					MyApp.isVideoCardFormat = true;
+				}
+			} else if (Intent.ACTION_TIME_TICK.equals(action)) {
+				// 获取时间
+				Calendar calendar = Calendar.getInstance();
+				int minute = calendar.get(Calendar.MINUTE);
+				if (minute == 0) {
+					int year = calendar.get(Calendar.YEAR);
+					MyLog.v("[TimeTickReceiver]Year:" + year);
+
+					int hour = calendar.get(Calendar.HOUR_OF_DAY);
+					if (MyApp.isAccOn) { // ACC_ON
+						if (year >= 2016) {
+							if (1 == SettingUtil.getAccStatus()) { // 再次确认
+								HintUtil.speakVoice(context, "整点报时:" + hour
+										+ "点整");
+							}
+						}
+					} else { // ACC_OFF
+						if (hour == 3) { // 凌晨3点重启机器
+							context.sendBroadcast(new Intent(
+									"tchip.intent.action.ACTION_REBOOT"));
+						}
+					}
+				}
+			}
+
+		}
+	}
+
+	/** 预备唤醒(ACC_ON)线程 **/
+	public class PreWakeThread implements Runnable {
+
+		@Override
+		public void run() {
+			synchronized (preWakeHandler) {
+				/** 激发条件:1.ACC上电 **/
+				while (MyApp.isWakeConfirm && MyApp.isAccOn) {
+					try {
+						Thread.sleep(1000);
+						Message message = new Message();
+						message.what = 1;
+						preWakeHandler.sendMessage(message);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
 			}
 		}
+
+	}
+
+	private final Handler preWakeHandler = new Handler() {
+		public void handleMessage(Message msg) {
+			switch (msg.what) {
+			case 1:
+				if (MyApp.isAccOn) {
+					preWakeCount++;
+				} else {
+					preWakeCount = 0;
+				}
+				MyLog.v("[ParkingMonitor]preWakeCount:" + preWakeCount);
+
+				if (preWakeCount == TIME_WAKE_CONFIRM && MyApp.isAccOn) {
+					MyApp.isWakeConfirm = false;
+					preWakeCount = 0;
+					deviceWake();
+				}
+				break;
+
+			default:
+				break;
+			}
+		}
+	};
+
+	/** 预备休眠线程 **/
+	public class PreSleepThread implements Runnable {
+
+		@Override
+		public void run() {
+			synchronized (preSleepHandler) {
+				/** 激发条件:1.ACC下电 2.未进入休眠 **/
+				while (MyApp.isSleepConfirm && !MyApp.isAccOn
+						&& !MyApp.isSleeping) {
+					try {
+						Thread.sleep(1000);
+						Message message = new Message();
+						message.what = 1;
+						preSleepHandler.sendMessage(message);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		}
+
+	}
+
+	final Handler preSleepHandler = new Handler() {
+
+		public void handleMessage(Message msg) {
+			switch (msg.what) {
+			case 1:
+				if (!MyApp.isAccOn) {
+					preSleepCount++;
+				} else {
+					preSleepCount = 0;
+				}
+				MyLog.v("[ParkingMonitor]preSleepCount:" + preSleepCount);
+
+				if (preSleepCount == TIME_SLEEP_CONFIRM && !MyApp.isAccOn
+						&& !MyApp.isSleeping) {
+					MyApp.isSleepConfirm = false;
+					preSleepCount = 0;
+					deviceAccOff();
+				}
+				break;
+
+			default:
+				break;
+			}
+		}
+
+	};
+
+	/**
+	 * 90s后进入停车侦测守卫模式，期间如果ACC上电则取消
+	 */
+	public class GoingParkMonitorThread implements Runnable {
+
+		@Override
+		public void run() {
+			synchronized (goingParkMonitorHandler) {
+				/** 激发条件:1.ACC下电 2.未进入休眠 **/
+				while (!MyApp.isAccOn && !MyApp.isSleeping) {
+					try {
+						Thread.sleep(1000);
+						Message message = new Message();
+						message.what = 1;
+						goingParkMonitorHandler.sendMessage(message);
+
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		}
+	}
+
+	final Handler goingParkMonitorHandler = new Handler() {
+		public void handleMessage(android.os.Message msg) {
+			switch (msg.what) {
+			case 1:
+				if (!MyApp.isAccOn) {
+					accOffCount++;
+				} else {
+					accOffCount = 0;
+				}
+				MyLog.v("[ParkingMonitor]accOffCount:" + accOffCount);
+
+				if (accOffCount >= TIME_SLEEP_GOING && !MyApp.isAccOn
+						&& !MyApp.isSleeping) {
+					deviceSleep();
+				}
+				break;
+
+			default:
+				break;
+			}
+		}
+	};
+
+	/**
+	 * 执行90秒任务
+	 */
+	private void deviceAccOff() {
+		accOffCount = 0;
+		if (!MyApp.isMainForeground) {
+			// 发送Home键，回到主界面
+			sendKeyCode(KeyEvent.KEYCODE_HOME);
+			if (!powerManager.isScreenOn()) { // 确保屏幕点亮
+				SettingUtil.lightScreen(getApplicationContext());
+			}
+		}
+		MyApp.shouldTakePhotoWhenAccOff = true;
+		acquireWakeLock();
+		new Thread(new GoingParkMonitorThread()).start();
+
+		stopExternalService();
+
+		// 单纯关闭FM发射
+		SettingUtil.SaveFileToNode(SettingUtil.nodeFmEnable, "0");
+		sendBroadcast(new Intent("com.tchip.FM_CLOSE_CARLAUNCHER")); // 通知状态栏同步图标
+	}
+
+	/**
+	 * 休眠广播触发
+	 */
+	private void deviceSleep() {
+		try {
+			MyLog.e("[SleepOnOffService]deviceSleep.");
+			MyApp.isSleeping = true; // 进入低功耗待机
+		} catch (Exception e) {
+			MyLog.e("[SleepReceiver]Error when run deviceSleep");
+		} finally {
+			MyApp.isAccOffPhotoTaking = false; // 重置ACC下电拍照标志
+			SettingUtil.setAirplaneMode(context, true); // 打开飞行模式
+			context.sendBroadcast(new Intent(Constant.Broadcast.SLEEP_ON)); // 通知其他应用进入休眠
+		}
+	}
+
+	/**
+	 * 唤醒广播触发
+	 */
+	private void deviceWake() {
+		try {
+			MyApp.isSleeping = false; // 取消低功耗待机
+			startExternalService();
+
+			MyApp.shouldStopWhenCrashVideoSave = false; // 如果当前正在停车侦测录像，录满30S后不停止
+
+			// MainActivity,BackThread的Handler启动AutoThread,启动录像和服务
+			MyApp.shouldWakeRecord = true;
+
+			sendKeyCode(KeyEvent.KEYCODE_HOME); // 发送Home键，回到主界面
+			SettingUtil.setAirplaneMode(context, false); // 关闭飞行模式
+			SettingUtil.setGpsState(context, true); // 打开GPS
+			// SettingUtil.setEDogEnable(true); // 打开电子狗电源
+			context.sendBroadcast(new Intent(Constant.Broadcast.SLEEP_OFF)); // 通知其他应用取消休眠
+
+			// 重置FM发射状态
+			if (SettingUtil.isFmTransmitOnSetting(context)) {
+				SettingUtil.SaveFileToNode(SettingUtil.nodeFmEnable, "1");
+				sendBroadcast(new Intent("com.tchip.FM_OPEN_CARLAUNCHER"));
+			}
+			// boolean fmStateBeforeSleep = sharedPreferences.getBoolean(
+			// "fmStateBeforeSleep", false);
+			// if (fmStateBeforeSleep) {
+			// MyLog.v("[SleepReceiver]WakeUp:open FM Transmit");
+			// Settings.System.putString(context.getContentResolver(),
+			// Constant.FMTransmit.SETTING_ENABLE, "1");
+			// SettingUtil.SaveFileToNode(SettingUtil.nodeFmEnable, "1");
+			// sendBroadcast(new Intent("com.tchip.FM_OPEN_CARLAUNCHER")); //
+			// 通知状态栏同步图标
+			// }
+		} catch (Exception e) {
+			MyLog.e("[SleepReceiver]Error when run deviceWake");
+		}
+	}
+
+	/**
+	 * 开启外部服务：
+	 * 
+	 * 1.碰撞侦测服务
+	 */
+	private void startExternalService() {
+		try {
+			// 碰撞侦测服务
+			Intent intentCrash = new Intent(context, SensorWatchService.class);
+			startService(intentCrash);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+	}
+
+	/**
+	 * 关闭外部应用与服务：
+	 * 
+	 * GPS、电子狗
+	 * 
+	 * 酷我音乐、高德地图、喜马拉雅
+	 * 
+	 * 碰撞侦测服务
+	 */
+	private void stopExternalService() {
+		try {
+			SettingUtil.setGpsState(MainActivity.this, false); // 关闭GPS
+			SettingUtil.setEDogEnable(false); // 关闭电子狗电源
+			// 碰撞侦测服务
+			Intent intentCrash = new Intent(context, SensorWatchService.class);
+			stopService(intentCrash);
+
+			KWAPI.createKWAPI(this, "auto").exitAPP(this);
+			String[] arrayKillApp = { "cn.kuwo.kwmusiccar", // 酷我音乐
+					"com.android.gallery3d", // 图库
+					"com.autonavi.amapauto", // 高德地图（车机版）
+					"com.hdsc.monitor.heart.monitorvoice", // 善领云中心
+					"com.ximalaya.ting.android.car", // 喜马拉雅（车机版）
+					"com.autonavi.minimap" // 高德地图
+			};
+			SettingUtil.killApp(context, arrayKillApp);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * 获取休眠锁
+	 * 
+	 * PARTIAL_WAKE_LOCK
+	 * 
+	 * SCREEN_DIM_WAKE_LOCK
+	 * 
+	 * FULL_WAKE_LOCK
+	 * 
+	 * ON_AFTER_RELEASE
+	 */
+	private void acquireWakeLock() {
+		wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
+				this.getClass().getCanonicalName());
+		wakeLock.acquire(90 * 1000);
+		MyLog.v("[SleepOnOff]WakeLock acquire");
 	}
 
 	/** 更新右上角图标 */
@@ -531,7 +1010,7 @@ public class MainActivity extends Activity implements TachographCallback,
 		public void run() {
 			try {
 				initialService();
-				StartCheckErrorFileThread(); // 检查并删除异常视频文件
+				StartCheckErrorVideoFile(); // 检查并删除异常视频文件
 				// 自动录像:如果已经在录像则不处理
 				if (Constant.Record.autoRecord && !MyApp.isVideoReording) {
 					Thread.sleep(Constant.Record.autoRecordDelay);
@@ -783,7 +1262,7 @@ public class MainActivity extends Activity implements TachographCallback,
 						}
 						setInterval(3 * 60); // 防止在分段一分钟的时候，停车守卫录出1分和0秒两段视频
 
-						StartCheckErrorFileThread();
+						StartCheckErrorVideoFile();
 						if (!MyApp.isVideoReording) {
 							if (startRecordTask() == 0) {
 								setRecordState(true);
@@ -902,10 +1381,6 @@ public class MainActivity extends Activity implements TachographCallback,
 
 		// WiFi状态信息
 		imageWifiLevel = (ImageView) findViewById(R.id.imageWifiLevel);
-		// wifiIntentFilter = new IntentFilter();
-		// wifiIntentFilter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
-		// wifiIntentFilter.addAction(WifiManager.RSSI_CHANGED_ACTION);
-		// wifiIntentFilter.setPriority(Integer.MAX_VALUE);
 
 		// 3G状态信息
 		imageSignalLevel = (ImageView) findViewById(R.id.imageSignalLevel);
@@ -1236,6 +1711,7 @@ public class MainActivity extends Activity implements TachographCallback,
 		public void handleMessage(Message msg) {
 			switch (msg.what) {
 			case 1: // 处理停车守卫录像
+				this.removeMessages(1);
 				if (!ClickUtil.isPlusRecordTimeTooQuick(900)) {
 					secondCount++;
 				}
@@ -1282,10 +1758,11 @@ public class MainActivity extends Activity implements TachographCallback,
 				}
 				textRecordTime.setText(DateUtil
 						.getFormatTimeBySecond(secondCount));
-
+				this.removeMessages(1);
 				break;
 
 			case 2: // SD卡异常移除：停止录像
+				this.removeMessages(2);
 				MyLog.v("[UpdateRecordTimeHandler]stopRecorder() 2");
 				if (stopRecorder() == 0) {
 					setRecordState(false);
@@ -1300,9 +1777,11 @@ public class MainActivity extends Activity implements TachographCallback,
 				HintUtil.speakVoice(MainActivity.this, strVideoCardEject);
 				audioRecordDialog.showErrorDialog(strVideoCardEject);
 				new Thread(new dismissDialogThread()).start();
+				this.removeMessages(2);
 				break;
 
 			case 3: // 电源断开，停止录像
+				this.removeMessages(3);
 				MyLog.v("[UpdateRecordTimeHandler]stopRecorder() 3");
 				if (stopRecorder() == 0) {
 					setRecordState(false);
@@ -1317,9 +1796,11 @@ public class MainActivity extends Activity implements TachographCallback,
 				MyLog.e("Record Stop:power unconnect.");
 				audioRecordDialog.showErrorDialog(strPowerUnconnect);
 				new Thread(new dismissDialogThread()).start();
+				this.removeMessages(3);
 				break;
 
 			case 4:
+				this.removeMessages(4);
 				MyApp.isCrashed = false;
 				// 碰撞后判断是否需要加锁第二段视频
 				if (intervalState == Constant.Record.STATE_INTERVAL_1MIN) {
@@ -1332,14 +1813,20 @@ public class MainActivity extends Activity implements TachographCallback,
 					}
 				}
 				setupRecordViews();
+				this.removeMessages(4);
 				break;
 
 			case 5: // 进入休眠，停止录像
+				this.removeMessages(5);
 				MyLog.v("[UpdateRecordTimeHandler]stopRecorder() 5");
 				if (stopRecorder() == 0) {
 					setRecordState(false);
 				} else {
-					MyLog.e("stopRecorder Error 5");
+					if (stopRecorder() == 0) {
+						setRecordState(false);
+					} else {
+						MyLog.e("stopRecorder Error 5");
+					}
 				}
 				// 如果此时屏幕为点亮状态，则不回收
 				boolean isScreenOn = powerManager.isScreenOn();
@@ -1347,18 +1834,22 @@ public class MainActivity extends Activity implements TachographCallback,
 					releaseCameraZone();
 				}
 				MyApp.shouldResetRecordWhenResume = true;
+				this.removeMessages(5);
 				break;
 
 			case 6: // 语音命令：停止录像
+				this.removeMessages(6);
 				MyLog.v("[UpdateRecordTimeHandler]stopRecorder() 6");
 				if (stopRecorder() == 0) {
 					setRecordState(false);
 				} else {
 					MyLog.e("stopRecorder Error 6");
 				}
+				this.removeMessages(6);
 				break;
 
-			case 7:
+			case 7: // 格式化存储卡：停止录像
+				this.removeMessages(7);
 				MyLog.v("[UpdateRecordTimeHandler]stopRecorder() 7");
 				if (stopRecorder() == 0) {
 					setRecordState(false);
@@ -1373,15 +1864,18 @@ public class MainActivity extends Activity implements TachographCallback,
 				HintUtil.speakVoice(MainActivity.this, strVideoCardFormat);
 				audioRecordDialog.showErrorDialog(strVideoCardFormat);
 				new Thread(new dismissDialogThread()).start();
+				this.removeMessages(7);
 				break;
 
 			case 8: // 程序异常，停止录像
+				this.removeMessages(8);
 				MyLog.v("[UpdateRecordTimeHandler]stopRecorder() 8");
 				if (stopRecorder() == 0) {
 					setRecordState(false);
 				} else {
 					MyLog.e("stopRecorder Error 8");
 				}
+				this.removeMessages(8);
 				break;
 
 			default:
@@ -1913,7 +2407,7 @@ public class MainActivity extends Activity implements TachographCallback,
 
 		@Override
 		public void run() {
-			StartCheckErrorFileThread();
+			StartCheckErrorVideoFile();
 			int i = 0;
 			while (i < 5) {
 				if (MyApp.isVideoReording) {
@@ -2279,7 +2773,7 @@ public class MainActivity extends Activity implements TachographCallback,
 
 			Message messageReleaseWhenStartRecord = new Message();
 			messageReleaseWhenStartRecord.what = 2;
-			taskHandler.sendMessage(messageReleaseWhenStartRecord);
+			costHandler.sendMessage(messageReleaseWhenStartRecord);
 			if (!StorageUtil.isStorageLess()) {
 				return 0;
 			} else {
@@ -2315,7 +2809,7 @@ public class MainActivity extends Activity implements TachographCallback,
 			if (type == 1) { // 视频
 				Message messageDeleteUnlockVideo = new Message();
 				messageDeleteUnlockVideo.what = 1;
-				taskHandler.sendMessage(messageDeleteUnlockVideo);
+				costHandler.sendMessage(messageDeleteUnlockVideo);
 
 				String videoName = path.split("/")[4]; // 5
 				int videoResolution = (resolutionState == Constant.Record.STATE_RESOLUTION_720P) ? 720
@@ -2335,7 +2829,7 @@ public class MainActivity extends Activity implements TachographCallback,
 						videoResolution);
 				videoDb.addDriveVideo(driveVideo);
 
-				StartCheckErrorFileThread(); // 执行onFileSave时，此file已经不隐藏，下个正在录的为隐藏
+				StartCheckErrorVideoFile(); // 执行onFileSave时，此file已经不隐藏，下个正在录的为隐藏
 				MyLog.v("[onFileSave]videoLock:" + videoLock
 						+ ", isVideoLockSecond:" + MyApp.isVideoLockSecond);
 			} else { // 图片
@@ -2343,7 +2837,9 @@ public class MainActivity extends Activity implements TachographCallback,
 						getResources().getString(R.string.hint_photo_save));
 
 				MyApp.writeImageExifPath = path;
-				new Thread(new WriteImageExifThread()).start();
+				Message msgWriteImageExif = new Message();
+				msgWriteImageExif.what = 5;
+				costHandler.sendMessage(msgWriteImageExif);
 
 				if (MyApp.shouldSendPathToDSA) {
 					MyApp.shouldSendPathToDSA = false;
@@ -2374,38 +2870,11 @@ public class MainActivity extends Activity implements TachographCallback,
 		}
 	}
 
-	private class WriteImageExifThread implements Runnable {
-
-		@Override
-		public void run() {
-			StorageUtil.writeImageExif();
-		}
-
-	}
-
 	/** 检查并删除异常视频文件：SD存在但数据库中不存在的文件 */
-	private void StartCheckErrorFileThread() {
-		MyLog.v("[CheckErrorFile]isVideoChecking:" + isVideoChecking);
-		if (!isVideoChecking) {
-			new Thread(new CheckVideoThread()).start();
-		}
-	}
-
-	/** 当前是否正在校验错误视频 */
-	private boolean isVideoChecking = false;
-
-	private class CheckVideoThread implements Runnable {
-
-		@Override
-		public void run() {
-			MyLog.v("[CheckVideoThread]START:" + DateUtil.getTimeStr("mm:ss"));
-			isVideoChecking = true;
-			File file = new File(Constant.Path.RECORD_FRONT);
-			StorageUtil.RecursionCheckFile(MainActivity.this, file);
-			MyLog.v("[CheckVideoThread]END:" + DateUtil.getTimeStr("mm:ss"));
-			isVideoChecking = false;
-		}
-
+	private void StartCheckErrorVideoFile() {
+		Message msgCheckVideo = new Message();
+		msgCheckVideo.what = 6;
+		costHandler.sendMessage(msgCheckVideo);
 	}
 
 	public void setup() {

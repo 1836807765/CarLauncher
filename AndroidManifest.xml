@@ -4,7 +4,7 @@
     package="com.tchip.carlauncher"
     android:sharedUserId="android.uid.system"
     android:versionCode="3"
-    android:versionName="2016.04.29-11:05" >
+    android:versionName="2016.04.29-17:05" >
 
     <uses-sdk
         android:minSdkVersion="19"
@@ -96,11 +96,7 @@
         </receiver>
 
         <service android:name="com.tchip.carlauncher.service.SensorWatchService" />
-        <service android:name="com.tchip.carlauncher.service.SleepOnOffService" />
         <service android:name="com.tchip.carlauncher.service.FloatWindowService" />
-        <service
-            android:name="com.tchip.carlauncher.service.TimeTickService"
-            android:exported="true" />
     </application>
 
 </manifest>

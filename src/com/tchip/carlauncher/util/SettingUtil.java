@@ -19,6 +19,7 @@ import java.util.Enumeration;
 import java.util.List;
 
 import com.tchip.carlauncher.Constant;
+import com.tchip.carlauncher.MyApp;
 
 import android.app.ActivityManager;
 import android.app.KeyguardManager;
@@ -150,7 +151,7 @@ public class SettingUtil {
 		String fmEnable = Settings.System.getString(
 				context.getContentResolver(),
 				Constant.FMTransmit.SETTING_ENABLE);
-		if (fmEnable.trim().length() > 0) {
+		if (fmEnable != null && fmEnable.trim().length() > 0) {
 			if ("1".equals(fmEnable)) {
 				isFmTransmitOpen = true;
 			} else {
@@ -340,29 +341,31 @@ public class SettingUtil {
 
 		// 1.启动时初始化FM发射频率节点,频率范围：7600~10800:8750-10800
 		try {
-			int freq = getFmFrequceny(context);
-			if (freq >= 8750 && freq <= 10800)
-				setFmFrequency(context, freq);
-			else
-				setFmFrequency(context, 8750);
+			if (MyApp.isAccOn) {
+				int freq = getFmFrequceny(context);
+				if (freq >= 8750 && freq <= 10800)
+					setFmFrequency(context, freq);
+				else
+					setFmFrequency(context, 8750);
 
-			boolean isFmOn = isFmTransmitOnSetting(context);
-			Settings.System.putString(context.getContentResolver(),
-					Constant.FMTransmit.SETTING_ENABLE, isFmOn ? "1" : "0");
-			String nodeFmEnableStr = "" + getFileInt(nodeFmEnable);
-			if (isFmOn) {
-				if ("0".equals(nodeFmEnableStr)) {
-					SaveFileToNode(nodeFmEnable, "1");
-				}
-			} else {
-				if ("1".equals(nodeFmEnableStr)) {
-					SaveFileToNode(nodeFmEnable, "0");
+				boolean isFmOn = isFmTransmitOnSetting(context);
+				// Settings.System.putString(context.getContentResolver(),
+				// Constant.FMTransmit.SETTING_ENABLE, isFmOn ? "1" : "0");
+				int intFmEnable = getFileInt(nodeFmEnable);
+				if (isFmOn) {
+					if (intFmEnable == 0) {
+						SaveFileToNode(nodeFmEnable, "1");
+						context.sendBroadcast(new Intent(
+								"com.tchip.FM_OPEN_CARLAUNCHER")); // 通知状态栏同步图标
+					}
+				} else {
+					if (intFmEnable == 1) {
+						SaveFileToNode(nodeFmEnable, "0");
+						context.sendBroadcast(new Intent(
+								"com.tchip.FM_CLOSE_CARLAUNCHER")); // 通知状态栏同步图标
+					}
 				}
 			}
-			context.sendBroadcast(new Intent(
-					isFmOn ? "com.tchip.FM_OPEN_CARLAUNCHER"
-							: "com.tchip.FM_CLOSE_CARLAUNCHER")); // 通知状态栏同步图标
-
 		} catch (Exception e) {
 			MyLog.e("[SettingUtil]initFmTransmit: Catch Exception!");
 		}
