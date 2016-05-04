@@ -83,15 +83,6 @@ public class MainActivity extends Activity implements TachographCallback,
 	private final Handler costHandler = new CostHandler(
 			costHandlerThread.getLooper());
 
-	/** 非UI线程2：及时，适用不阻塞操作 */
-	private static final HandlerThread nowHandlerThread = new HandlerThread(
-			"now-thread");
-	static {
-		nowHandlerThread.start();
-	}
-	private final Handler nowHandler = new NowHandler(
-			nowHandlerThread.getLooper());
-
 	private SharedPreferences sharedPreferences;
 	private Editor editor;
 	private DriveVideoDbHelper videoDb;
@@ -398,50 +389,6 @@ public class MainActivity extends Activity implements TachographCallback,
 
 	}
 
-	/** 适用：不耗时，不阻塞操作 */
-	class NowHandler extends Handler {
-
-		public NowHandler(Looper looper) {
-			super(looper);
-		}
-
-		@Override
-		public void handleMessage(Message msg) {
-			switch (msg.what) {
-			case 1: // 接收到ACC_ON广播
-				if (!this.hasMessages(2)) {
-					// this.removeMessages(1);
-					MyApp.isAccOn = true;
-					MyApp.isAccOffPhotoTaking = false; // 重置ACC下电拍照标志
-					preSleepCount = 0;
-					MyApp.isSleepConfirm = false;
-					preWakeCount = 0;
-					MyApp.isWakeConfirm = true;
-					new Thread(new PreWakeThread()).start();
-					// this.removeMessages(1);
-				}
-				break;
-
-			case 2: // 接收到ACC_OFF广播
-				if (!this.hasMessages(1)) {
-					// this.removeMessages(2);
-					MyApp.isAccOn = false;
-					preSleepCount = 0;
-					MyApp.isSleepConfirm = true;
-					preWakeCount = 0;
-					MyApp.isWakeConfirm = false;
-					new Thread(new PreSleepThread()).start();
-					// this.removeMessages(2);
-				}
-				break;
-
-			default:
-				break;
-			}
-			super.handleMessage(msg);
-		}
-	}
-
 	private MainReceiver mainReceiver;
 
 	/** 监听飞行模式，外置蓝牙广播 */
@@ -457,13 +404,20 @@ public class MainActivity extends Activity implements TachographCallback,
 			} else if (Constant.Broadcast.BT_DISCONNECTED.equals(action)) {
 				setBluetoothIcon(0);
 			} else if (Constant.Broadcast.ACC_OFF.equals(action)) {
-				Message msgReceiveAccOff = new Message();
-				msgReceiveAccOff.what = 2;
-				nowHandler.sendMessage(msgReceiveAccOff);
+				MyApp.isAccOn = false;
+				preSleepCount = 0;
+				MyApp.isSleepConfirm = true;
+				preWakeCount = 0;
+				MyApp.isWakeConfirm = false;
+				new Thread(new PreSleepThread()).start();
 			} else if (Constant.Broadcast.ACC_ON.equals(action)) {
-				Message msgReceiveAccOn = new Message();
-				msgReceiveAccOn.what = 1;
-				nowHandler.sendMessage(msgReceiveAccOn);
+				MyApp.isAccOn = true;
+				MyApp.isAccOffPhotoTaking = false; // 重置ACC下电拍照标志
+				preSleepCount = 0;
+				MyApp.isSleepConfirm = false;
+				preWakeCount = 0;
+				MyApp.isWakeConfirm = true;
+				new Thread(new PreWakeThread()).start();
 			} else if (Constant.Broadcast.GSENSOR_CRASH.equals(action)) { // 停车守卫:侦测到碰撞广播触发
 				if (MyApp.isSleeping) {
 					MyLog.v("[GSENSOR_CRASH]Before State->shouldCrashRecord:"
@@ -2125,7 +2079,7 @@ public class MainActivity extends Activity implements TachographCallback,
 	private void startRecord() {
 		try {
 			if (recordState == Constant.Record.STATE_RECORD_STOPPED) {
-				if (MyApp.isSleeping) {
+				if (MyApp.isSleeping || !MyApp.isAccOn) {
 					HintUtil.speakVoice(MainActivity.this, getResources()
 							.getString(R.string.hint_stop_record_sleeping));
 				} else {
