@@ -4,7 +4,7 @@
     package="com.tchip.carlauncher"
     android:sharedUserId="android.uid.system"
     android:versionCode="3"
-    android:versionName="2016.05.03-20:35" >
+    android:versionName="2016.05.12-20:40" >
 
     <uses-sdk
         android:minSdkVersion="19"
@@ -75,6 +75,7 @@
         </activity>
         <activity
             android:name="com.tchip.carlauncher.ui.activity.MultimediaActivity"
+            android:exported="true"
             android:screenOrientation="landscape" />
 
         <provider

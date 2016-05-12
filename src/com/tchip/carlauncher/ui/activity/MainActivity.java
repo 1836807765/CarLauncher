@@ -208,6 +208,7 @@ public class MainActivity extends Activity implements TachographCallback,
 		mainFilter.addAction(Constant.Broadcast.SPEECH_COMMAND);
 		mainFilter.addAction(Constant.Broadcast.SETTING_SYNC);
 		mainFilter.addAction(Constant.Broadcast.MEDIA_FORMAT);
+		mainFilter.addAction(Constant.Broadcast.GOING_SHUTDOWN);
 		mainFilter.addAction(Intent.ACTION_TIME_TICK);
 		registerReceiver(mainReceiver, mainFilter);
 
@@ -368,6 +369,8 @@ public class MainActivity extends Activity implements TachographCallback,
 				this.removeMessages(4);
 				sendBroadcast(new Intent(Constant.Broadcast.SLEEP_ON)); // 通知其他应用进入休眠
 				SettingUtil.setAirplaneMode(MainActivity.this, true); // 打开飞行模式
+				context.sendBroadcast(new Intent(
+						"com.tchip.FM_CLOSE_CARLAUNCHER")); // 通知状态栏同步图标
 				stopExternalService();
 				this.removeMessages(4);
 				break;
@@ -503,6 +506,8 @@ public class MainActivity extends Activity implements TachographCallback,
 				if ("/storage/sdcard2".equals(path)) {
 					MyApp.isVideoCardFormat = true;
 				}
+			} else if (Constant.Broadcast.GOING_SHUTDOWN.equals(action)) {
+				MyApp.isGoingShutdown = true;
 			} else if (Intent.ACTION_TIME_TICK.equals(action)) {
 				// 获取时间
 				Calendar calendar = Calendar.getInstance();
@@ -1625,6 +1630,13 @@ public class MainActivity extends Activity implements TachographCallback,
 					messageFormat.what = 7;
 					updateRecordTimeHandler.sendMessage(messageFormat);
 					return;
+				} else if (MyApp.isGoingShutdown) {
+					MyApp.isGoingShutdown = false;
+					MyLog.e("Going shutdown, stop record!");
+					Message messageFormat = new Message();
+					messageFormat.what = 9;
+					updateRecordTimeHandler.sendMessage(messageFormat);
+					return;
 				} else if (!MyApp.isPowerConnect) { // 电源断开
 					MyLog.e("Stop Record:Power is unconnected");
 					Message messagePowerUnconnect = new Message();
@@ -1830,6 +1842,23 @@ public class MainActivity extends Activity implements TachographCallback,
 					MyLog.e("stopRecorder Error 8");
 				}
 				this.removeMessages(8);
+				break;
+
+			case 9: // 系统关机，停止录像
+				this.removeMessages(9);
+				MyLog.v("[UpdateRecordTimeHandler]stopRecorder() 9");
+				if (stopRecorder() == 0) {
+					setRecordState(false);
+				} else {
+					MyLog.e("stopRecorder Error 7");
+				}
+				String strGoingShutdown = getResources().getString(
+						R.string.hint_going_shutdown);
+				HintUtil.showToast(MainActivity.this, strGoingShutdown);
+
+				MyLog.e("CardEjectReceiver:Going Shutdown");
+				HintUtil.speakVoice(MainActivity.this, strGoingShutdown);
+				this.removeMessages(9);
 				break;
 
 			default:
