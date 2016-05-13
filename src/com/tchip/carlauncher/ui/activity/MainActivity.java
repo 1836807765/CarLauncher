@@ -1034,6 +1034,7 @@ public class MainActivity extends Activity implements TachographCallback,
 		public void handleMessage(Message msg) {
 			switch (msg.what) {
 			case 1:
+				this.removeMessages(1);
 				if (MyApp.isMainForeground) {
 					updateRightTopIcon();
 				}
@@ -1080,6 +1081,7 @@ public class MainActivity extends Activity implements TachographCallback,
 					MyApp.shouldTakeVoicePhoto = false;
 					new Thread(new TakeVoicePhotoThread()).start();
 				}
+				this.removeMessages(1);
 				break;
 
 			default:
