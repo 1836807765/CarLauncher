@@ -190,6 +190,7 @@ public class OpenUtil {
 							"com.tchip.call.MainActivity");
 					Intent intentDialer = new Intent();
 					intentDialer.setComponent(componentDialer);
+					intentDialer.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 					activity.startActivity(intentDialer);
 					activity.overridePendingTransition(
 							R.anim.zms_translate_up_out,
@@ -211,6 +212,7 @@ public class OpenUtil {
 							"entry.dsa2014", "entry.dsa2014.MainActivity");
 					Intent intentEDog = new Intent();
 					intentEDog.setComponent(componentEDog);
+					intentEDog.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 					activity.startActivity(intentEDog);
 					activity.overridePendingTransition(
 							R.anim.zms_translate_up_out,
@@ -232,6 +234,7 @@ public class OpenUtil {
 							"com.tchip.filemanager.ui.activity.MainActivity");
 					Intent intentFileExplorer = new Intent();
 					intentFileExplorer.setComponent(componentFileExplorer);
+					intentFileExplorer.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 					activity.startActivity(intentFileExplorer);
 					activity.overridePendingTransition(
 							R.anim.zms_translate_up_out,
@@ -244,6 +247,7 @@ public class OpenUtil {
 							"com.mediatek.filemanager.FileManagerOperationActivity");
 					Intent intentFileMtk = new Intent();
 					intentFileMtk.setComponent(componentFileMtk);
+					intentFileMtk.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 					activity.startActivity(intentFileMtk);
 					activity.overridePendingTransition(
 							R.anim.zms_translate_up_out,
@@ -256,6 +260,7 @@ public class OpenUtil {
 							"com.tchip.fmtransmit.ui.activity.MainActivity");
 					Intent intentFM = new Intent();
 					intentFM.setComponent(componentFM);
+					intentFM.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 					activity.startActivity(intentFM);
 					activity.overridePendingTransition(
 							R.anim.zms_translate_up_out,
@@ -279,6 +284,7 @@ public class OpenUtil {
 							"com.android.mms.ui.BootActivity");
 					Intent intentMessage = new Intent();
 					intentMessage.setComponent(componentMessage);
+					intentMessage.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 					activity.startActivity(intentMessage);
 					activity.overridePendingTransition(
 							R.anim.zms_translate_up_out,
@@ -302,6 +308,7 @@ public class OpenUtil {
 							"cn.kuwo.kwmusiccar.WelcomeActivity");
 					Intent intentMusic = new Intent();
 					intentMusic.setComponent(componentMusic);
+					intentMusic.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 					activity.startActivity(intentMusic);
 					activity.overridePendingTransition(
 							R.anim.zms_translate_up_out,
@@ -384,6 +391,7 @@ public class OpenUtil {
 							"com.tchip.route.ui.activity.MainActivity");
 					Intent intentRoute = new Intent();
 					intentRoute.setComponent(componentRoute);
+					intentRoute.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 					activity.startActivity(intentRoute);
 					activity.overridePendingTransition(
 							R.anim.zms_translate_up_out,
@@ -395,6 +403,7 @@ public class OpenUtil {
 							"com.tchip.carsetting",
 							"com.tchip.carsetting.ui.activity.MainActivity");
 					Intent intentSetting = new Intent();
+					intentSetting.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 					intentSetting.setComponent(componentSetting);
 					activity.startActivity(intentSetting);
 					break;
@@ -445,6 +454,7 @@ public class OpenUtil {
 							"com.android.settings.Settings");
 					Intent intentSettingSystem = new Intent();
 					intentSettingSystem.setComponent(componentSettingSystem);
+					intentSettingSystem.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 					activity.startActivity(intentSettingSystem);
 					break;
 
@@ -505,6 +515,7 @@ public class OpenUtil {
 							"com.mirrtalk.app", "com.mirrtalk.app.MainActivity");
 					intentWeme.setComponent(componentWeme);
 					intentWeme.setAction("android.intent.action.VIEW");
+					intentWeme.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 					activity.startActivity(intentWeme);
 					activity.overridePendingTransition(
 							R.anim.zms_translate_up_out,
@@ -531,6 +542,7 @@ public class OpenUtil {
 							"com.ximalaya.ting.android.car.activity.WelcomeActivity");
 					intentXimaLaya.setComponent(componentXimalaya);
 					intentXimaLaya.setAction("android.intent.action.VIEW");
+					intentXimaLaya.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 					activity.startActivity(intentXimaLaya);
 					activity.overridePendingTransition(
 							R.anim.zms_translate_up_out,
