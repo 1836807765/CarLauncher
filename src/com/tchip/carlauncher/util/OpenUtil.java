@@ -512,7 +512,7 @@ public class OpenUtil {
 
 					Intent intentWeme = new Intent();
 					ComponentName componentWeme = new ComponentName(
-							"com.mirrtalk.app", "com.mirrtalk.app.MainActivity");
+							"com.mirrtalk.app", "com.mirrtalk.app.MtLoginActivity");
 					intentWeme.setComponent(componentWeme);
 					intentWeme.setAction("android.intent.action.VIEW");
 					intentWeme.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

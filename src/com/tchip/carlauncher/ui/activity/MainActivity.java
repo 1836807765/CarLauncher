@@ -1216,6 +1216,7 @@ public class MainActivity extends Activity implements TachographCallback,
 		public void handleMessage(Message msg) {
 			switch (msg.what) {
 			case 1:
+				this.removeMessages(1);
 				try {
 					if (recordState == Constant.Record.STATE_RECORD_STOPPED) {
 						if (!MyApp.isMainForeground) { // 发送Home键，回到主界面
@@ -1223,7 +1224,7 @@ public class MainActivity extends Activity implements TachographCallback,
 						}
 						setInterval(3 * 60); // 防止在分段一分钟的时候，停车守卫录出1分和0秒两段视频
 
-						StartCheckErrorVideoFile();
+						// StartCheckErrorVideoFile();
 						if (!MyApp.isVideoReording) {
 							if (startRecordTask() == 0) {
 								setRecordState(true);
@@ -1238,6 +1239,7 @@ public class MainActivity extends Activity implements TachographCallback,
 					MyLog.e("[EventRecord]recordWhenEventHappenHandler catch exception: "
 							+ e.toString());
 				}
+				this.removeMessages(1);
 				break;
 
 			default:
@@ -1801,7 +1803,7 @@ public class MainActivity extends Activity implements TachographCallback,
 				if (!isScreenOn) {
 					releaseCameraZone();
 				}
-				MyApp.shouldResetRecordWhenResume = true;
+				// MyApp.shouldResetRecordWhenResume = true; // FIXME:Really useless?
 				this.removeMessages(5);
 				break;
 
@@ -2170,7 +2172,7 @@ public class MainActivity extends Activity implements TachographCallback,
 	 * 调用地方：在成功执行{@link #stopRecorder}之后
 	 */
 	private void releaseCameraZone() {
-		if (!MyApp.isAccOn && !MyApp.isMainForeground) {
+		if (!MyApp.isAccOn && !MyApp.isMainForeground && !MyApp.isVideoReording) {
 			release();
 			// surfaceHolder = null;
 			if (camera != null) {
@@ -2180,6 +2182,19 @@ public class MainActivity extends Activity implements TachographCallback,
 			MyLog.v("[Record]releaseCameraZone");
 		}
 		MyApp.cameraState = CameraState.NULL;
+	}
+
+	/**
+	 * @deprecated Just For Testing
+	 */
+	private void forceReleaseCamera() {
+		release();
+		// surfaceHolder = null;
+		if (camera != null) {
+			camera.stopPreview();
+		}
+		MyApp.shouldResetRecordWhenResume = true;
+		MyLog.v("[Record]forceReleaseCamera");
 	}
 
 	// *********** Record ***********
@@ -2298,6 +2313,7 @@ public class MainActivity extends Activity implements TachographCallback,
 	 * @return
 	 */
 	private boolean openCamera() {
+		MyLog.v("camera openning");
 		if (camera != null) {
 			closeCamera();
 		}
@@ -2326,8 +2342,11 @@ public class MainActivity extends Activity implements TachographCallback,
 	 * @return
 	 */
 	private boolean closeCamera() {
-		if (camera == null)
+		MyLog.d("camera closing...");
+		if (camera == null) {
+			MyLog.d("camera is null");
 			return true;
+		}
 		try {
 			camera.lock();
 			camera.stopPreview();
@@ -2335,10 +2354,11 @@ public class MainActivity extends Activity implements TachographCallback,
 			camera.release();
 			camera.unlock();
 			camera = null;
+			MyLog.d("camera closed");
 			return true;
 		} catch (Exception ex) {
 			camera = null;
-			MyLog.e("[MainActivity]closeCamera:Catch Exception!");
+			MyLog.e("[Main]closeCamera:Catch Exception!");
 			return false;
 		}
 	}
@@ -2688,16 +2708,17 @@ public class MainActivity extends Activity implements TachographCallback,
 
 	/** 释放Recorder */
 	private void releaseRecorder() {
+		MyLog.d("Record Releasing...");
 		try {
 			if (carRecorder != null) {
 				carRecorder.stop();
 				carRecorder.close();
 				carRecorder.release();
 				carRecorder = null;
-				MyLog.d("Record Release");
+				MyLog.d("Record Released");
 			}
 		} catch (Exception e) {
-			MyLog.e("[MainActivity]releaseRecorder: Catch Exception!");
+			MyLog.e("[Main]releaseRecorder: Catch Exception!");
 		}
 	}
 
