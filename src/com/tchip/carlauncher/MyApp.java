@@ -52,6 +52,9 @@ public class MyApp extends Application {
 
 	/** ACC拍照后,在onFileSave中传Path给DSA */
 	public static boolean shouldSendPathToDSA = false;
+	
+	/** 碰撞将图片传给微信助手 */
+	public static boolean shouldSendPathToWechat = false;
 
 	/** 是否正在记录轨迹 */
 	public static boolean isRouteRecord = false;

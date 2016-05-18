@@ -442,13 +442,15 @@ public class MainActivity extends Activity implements TachographCallback,
 				String command = intent.getExtras().getString("command");
 				if ("take_photo".equals(command)) {
 					MyApp.shouldTakeVoicePhoto = true; // 语音拍照
+					MyApp.shouldSendPathToWechat = false;
 
 					sendKeyCode(KeyEvent.KEYCODE_HOME); // 发送Home键，回到主界面
 					if (!powerManager.isScreenOn()) { // 确保屏幕点亮
 						SettingUtil.lightScreen(getApplicationContext());
 					}
-				} else if ("take_photo_wenxin".equals(command)) {
+				} else if ("take_photo_wenxin".equals(command)) { // 碰撞
 					MyApp.shouldTakeVoicePhoto = true; // 语音拍照
+					MyApp.shouldSendPathToWechat = true;
 
 					sendKeyCode(KeyEvent.KEYCODE_HOME); // 发送Home键，回到主界面
 					if (!powerManager.isScreenOn()) { // 确保屏幕点亮
@@ -692,7 +694,7 @@ public class MainActivity extends Activity implements TachographCallback,
 			}
 		}
 		MyApp.shouldTakePhotoWhenAccOff = true;
-		acquireWakeLock();
+		acquireWakeLock(90 * 1000);
 		new Thread(new GoingParkMonitorThread()).start();
 
 		stopExternalService();
@@ -815,11 +817,11 @@ public class MainActivity extends Activity implements TachographCallback,
 	 * 
 	 * ON_AFTER_RELEASE
 	 */
-	private void acquireWakeLock() {
+	private void acquireWakeLock(long timeout) {
 		wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
 				this.getClass().getCanonicalName());
-		wakeLock.acquire(90 * 1000);
-		MyLog.v("[SleepOnOff]WakeLock acquire");
+		wakeLock.acquire(timeout);
+		MyLog.v("[SleepOnOff]WakeLock acquire, timeout:" + timeout);
 	}
 
 	/** 更新右上角图标 */
@@ -1069,6 +1071,7 @@ public class MainActivity extends Activity implements TachographCallback,
 						if (!MyApp.isMainForeground) { // 发送Home键，回到主界面
 							sendKeyCode(KeyEvent.KEYCODE_HOME);
 						}
+						acquireWakeLock(65 * 1000);
 						new Thread(new RecordWhenCrashThread()).start();
 					}
 				}
@@ -1094,7 +1097,7 @@ public class MainActivity extends Activity implements TachographCallback,
 		@Override
 		public void run() {
 			try {
-				Thread.sleep(1000);
+				Thread.sleep(500);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
@@ -1134,11 +1137,15 @@ public class MainActivity extends Activity implements TachographCallback,
 		public void handleMessage(Message msg) {
 			switch (msg.what) {
 			case 1:
+				this.removeMessages(1);
 				takePhotoWhenAccOff();
+				this.removeMessages(1);
 				break;
 
 			case 2:
+				this.removeMessages(2);
 				takePhotoWhenVoiceCommand();
+				this.removeMessages(2);
 				break;
 
 			default:
@@ -1714,12 +1721,14 @@ public class MainActivity extends Activity implements TachographCallback,
 				case Constant.Record.STATE_INTERVAL_3MIN:
 					if (secondCount >= 180) {
 						secondCount = 0;
+						acquireWakeLock(185 * 1000);
 					}
 					break;
 
 				case Constant.Record.STATE_INTERVAL_1MIN:
 					if (secondCount >= 60) {
 						secondCount = 0;
+						acquireWakeLock(65 * 1000);
 					}
 					break;
 
@@ -1803,7 +1812,8 @@ public class MainActivity extends Activity implements TachographCallback,
 				if (!isScreenOn) {
 					releaseCameraZone();
 				}
-				// MyApp.shouldResetRecordWhenResume = true; // FIXME:Really useless?
+				// MyApp.shouldResetRecordWhenResume = true; // FIXME:Really
+				// useless?
 				this.removeMessages(5);
 				break;
 
@@ -2748,6 +2758,10 @@ public class MainActivity extends Activity implements TachographCallback,
 				MyApp.shouldSendPathToDSA = false;
 				MyApp.isAccOffPhotoTaking = false;
 			}
+
+			if (MyApp.shouldSendPathToWechat) {
+				MyApp.shouldSendPathToWechat = false;
+			}
 			break;
 
 		case TachographCallback.ERROR_RECORDER_CLOSED:
@@ -2861,10 +2875,13 @@ public class MainActivity extends Activity implements TachographCallback,
 				}
 
 				// 通知语音
-				Intent intentImageSave = new Intent(
-						Constant.Broadcast.ACTION_IMAGE_SAVE);
-				intentImageSave.putExtra("path", path);
-				sendBroadcast(intentImageSave);
+				if (MyApp.shouldSendPathToWechat) {
+					MyApp.shouldSendPathToWechat = false;
+					Intent intentImageSave = new Intent(
+							Constant.Broadcast.ACTION_IMAGE_SAVE);
+					intentImageSave.putExtra("path", path);
+					sendBroadcast(intentImageSave);
+				}
 			}
 
 			sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,

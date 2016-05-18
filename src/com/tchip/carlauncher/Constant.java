@@ -270,7 +270,7 @@ public interface Constant {
 
 	public static final class Module {
 		/** 是否是公版软件 */
-		public static final boolean isPublic = false;
+		public static final boolean isPublic = true;
 
 		/** 双录是否录制到单卡 */
 		public static final boolean isRecordSingleCard = true;

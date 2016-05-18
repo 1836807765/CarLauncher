@@ -13,7 +13,7 @@ public class ClickUtil {
 		long time = System.currentTimeMillis();
 		long timeD = time - lastClickTime;
 		if (0 < timeD && timeD < clickMinSpan) {
-			MyLog.v("[ClickUtil]isQuickClick:Click Too Quickly!");
+			// MyLog.v("[ClickUtil]isQuickClick:Click Too Quickly!");
 			return true;
 		}
 		lastClickTime = time;
@@ -31,7 +31,7 @@ public class ClickUtil {
 		long time = System.currentTimeMillis();
 		long timeD = time - lastUpdate3GSingalTime;
 		if (0 < timeD && timeD < runMinSpan) {
-			MyLog.v("[ClickUtil]isUpdate3GSignalTooQuick,Run Too Quickly!");
+			// MyLog.v("[ClickUtil]isUpdate3GSignalTooQuick,Run Too Quickly!");
 			return true;
 		}
 		lastUpdate3GSingalTime = time;
@@ -44,7 +44,7 @@ public class ClickUtil {
 		long time = System.currentTimeMillis();
 		long timeD = time - lastUpdateRightTopIconTime;
 		if (0 < timeD && timeD < runMinSpan) {
-			MyLog.v("[ClickUtil]isUpdateRightTopIconTooQuick,Run Too Quickly!");
+			// MyLog.v("[ClickUtil]isUpdateRightTopIconTooQuick,Run Too Quickly!");
 			return true;
 		}
 		lastUpdateRightTopIconTime = time;
@@ -57,7 +57,7 @@ public class ClickUtil {
 		long time = System.currentTimeMillis();
 		long timeD = time - lastPlusRecordTime;
 		if (0 < timeD && timeD < runMinSpan) {
-			MyLog.v("[ClickUtil]isPlusRecordTimeTooQuick,Run Too Quickly!");
+			// MyLog.v("[ClickUtil]isPlusRecordTimeTooQuick,Run Too Quickly!");
 			return true;
 		}
 		lastPlusRecordTime = time;
@@ -70,7 +70,7 @@ public class ClickUtil {
 		long time = System.currentTimeMillis();
 		long timeD = time - lastSaveLogTime;
 		if (0 < timeD && timeD < runMinSpan) {
-			MyLog.v("[ClickUtil]isSaveLogTooQuick,Run Too Quickly!");
+			// MyLog.v("[ClickUtil]isSaveLogTooQuick,Run Too Quickly!");
 			return true;
 		}
 		lastSaveLogTime = time;
