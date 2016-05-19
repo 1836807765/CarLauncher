@@ -534,12 +534,12 @@ public class OpenUtil {
 
 				case XIMALAYA:
 					Intent intentXimaLaya = new Intent();
-					// ComponentName comp = new ComponentName(
-					// "com.ximalaya.ting.android",
-					// "com.ximalaya.ting.android.activity.login.WelcomeActivity");
+//					ComponentName componentXimalaya = new ComponentName(
+//							"com.ximalaya.ting.android.car",
+//							"com.ximalaya.ting.android.car.activity.WelcomeActivity");
 					ComponentName componentXimalaya = new ComponentName(
-							"com.ximalaya.ting.android.car",
-							"com.ximalaya.ting.android.car.activity.WelcomeActivity");
+							"com.txznet.music",
+							"com.txznet.music.ui.MainActivity");
 					intentXimaLaya.setComponent(componentXimalaya);
 					intentXimaLaya.setAction("android.intent.action.VIEW");
 					intentXimaLaya.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
