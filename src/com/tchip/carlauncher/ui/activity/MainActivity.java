@@ -32,6 +32,7 @@ import com.tchip.tachograph.TachographRecorder;
 import android.app.Activity;
 import android.app.Instrumentation;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -358,9 +359,11 @@ public class MainActivity extends Activity implements TachographCallback,
 			case 3: // onResume任务
 				this.removeMessages(3);
 				SettingUtil.initialNodeState(MainActivity.this);
-				if (!MyApp.isBTPlayMusic) { // 蓝牙播放音乐时不设置触摸声音
-					Settings.System.putString(getContentResolver(),
-							Settings.System.SOUND_EFFECTS_ENABLED, "1");
+				if (Constant.Module.isPublic) {
+					if (!MyApp.isBTPlayMusic) { // 蓝牙播放音乐时不设置触摸声音
+						Settings.System.putString(getContentResolver(),
+								Settings.System.SOUND_EFFECTS_ENABLED, "1");
+					}
 				}
 				this.removeMessages(3);
 				break;
@@ -408,6 +411,7 @@ public class MainActivity extends Activity implements TachographCallback,
 				setBluetoothIcon(0);
 			} else if (Constant.Broadcast.ACC_OFF.equals(action)) {
 				MyApp.isAccOn = false;
+				MyApp.shouldTakePhotoWhenAccOff = true;
 				preSleepCount = 0;
 				MyApp.isSleepConfirm = true;
 				preWakeCount = 0;
@@ -667,6 +671,7 @@ public class MainActivity extends Activity implements TachographCallback,
 				} else {
 					accOffCount = 0;
 				}
+
 				MyLog.v("[ParkingMonitor]accOffCount:" + accOffCount);
 
 				if (accOffCount >= TIME_SLEEP_GOING && !MyApp.isAccOn
@@ -689,11 +694,10 @@ public class MainActivity extends Activity implements TachographCallback,
 		if (!MyApp.isMainForeground) {
 			// 发送Home键，回到主界面
 			sendKeyCode(KeyEvent.KEYCODE_HOME);
-			if (!powerManager.isScreenOn()) { // 确保屏幕点亮
-				SettingUtil.lightScreen(getApplicationContext());
-			}
+			// if (!powerManager.isScreenOn()) { // 确保屏幕点亮
+			// SettingUtil.lightScreen(getApplicationContext());
+			// }
 		}
-		MyApp.shouldTakePhotoWhenAccOff = true;
 		acquireWakeLock(90 * 1000);
 		new Thread(new GoingParkMonitorThread()).start();
 
@@ -1078,11 +1082,11 @@ public class MainActivity extends Activity implements TachographCallback,
 				if (MyApp.shouldTakePhotoWhenAccOff) { // ACC下电拍照
 					MyApp.shouldTakePhotoWhenAccOff = false;
 					MyApp.shouldSendPathToDSA = true;
-					new Thread(new TakePhotoWhenAccOffThread()).start();
+					takePhotoWhenAccOff();
 				}
 				if (MyApp.shouldTakeVoicePhoto) { // 语音拍照
 					MyApp.shouldTakeVoicePhoto = false;
-					new Thread(new TakeVoicePhotoThread()).start();
+					takePhotoWhenVoiceCommand();
 				}
 				this.removeMessages(1);
 				break;
@@ -1092,39 +1096,6 @@ public class MainActivity extends Activity implements TachographCallback,
 			}
 		}
 	};
-
-	public class TakeVoicePhotoThread implements Runnable {
-		@Override
-		public void run() {
-			try {
-				Thread.sleep(500);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-			Message messageTakePhotoWhenAccOff = new Message();
-			messageTakePhotoWhenAccOff.what = 2;
-			takePhotoWhenEventHappenHandler
-					.sendMessage(messageTakePhotoWhenAccOff);
-		}
-	}
-
-	/** ACC下电拍照线程 */
-	public class TakePhotoWhenAccOffThread implements Runnable {
-
-		@Override
-		public void run() {
-			try {
-				Thread.sleep(1500);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-			Message messageTakePhotoWhenAccOff = new Message();
-			messageTakePhotoWhenAccOff.what = 1;
-			takePhotoWhenEventHappenHandler
-					.sendMessage(messageTakePhotoWhenAccOff);
-		}
-
-	}
 
 	/**
 	 * 处理需要拍照事件：
@@ -1137,15 +1108,11 @@ public class MainActivity extends Activity implements TachographCallback,
 		public void handleMessage(Message msg) {
 			switch (msg.what) {
 			case 1:
-				this.removeMessages(1);
-				takePhotoWhenAccOff();
-				this.removeMessages(1);
+
 				break;
 
 			case 2:
-				this.removeMessages(2);
-				takePhotoWhenVoiceCommand();
-				this.removeMessages(2);
+
 				break;
 
 			default:
@@ -1293,10 +1260,8 @@ public class MainActivity extends Activity implements TachographCallback,
 		public void handleMessage(Message msg) {
 			switch (msg.what) {
 			case 1:
-				// startRecord();
 				if (!MyApp.isVideoReording) {
 					startRecordTask();
-
 				}
 				break;
 
@@ -1798,19 +1763,15 @@ public class MainActivity extends Activity implements TachographCallback,
 			case 5: // 进入休眠，停止录像
 				this.removeMessages(5);
 				MyLog.v("[UpdateRecordTimeHandler]stopRecorder() 5");
-				if (stopRecorder() == 0) {
-					setRecordState(false);
-				} else {
-					if (stopRecorder() == 0) {
-						setRecordState(false);
-					} else {
-						MyLog.e("stopRecorder Error 5");
-					}
+				int tryTime = 0;
+				while (stopRecorder() != 0 && tryTime < 5) {
+					tryTime++;
 				}
+				setRecordState(false);
 				// 如果此时屏幕为点亮状态，则不回收
 				boolean isScreenOn = powerManager.isScreenOn();
 				if (!isScreenOn) {
-					releaseCameraZone();
+					// releaseCameraZone(); //FIXME
 				}
 				// MyApp.shouldResetRecordWhenResume = true; // FIXME:Really
 				// useless?
@@ -2123,15 +2084,17 @@ public class MainActivity extends Activity implements TachographCallback,
 		try {
 			if (recordState == Constant.Record.STATE_RECORD_STOPPED) {
 				if (MyApp.isSleeping || !MyApp.isAccOn) {
-					HintUtil.speakVoice(MainActivity.this, getResources()
-							.getString(R.string.hint_stop_record_sleeping));
+					if (!ClickUtil.isHintSleepTooQuick(3000)) {
+						HintUtil.speakVoice(MainActivity.this, getResources()
+								.getString(R.string.hint_stop_record_sleeping));
+					}
 				} else {
-					if (!powerManager.isScreenOn()) { // 点亮屏幕
-						SettingUtil.lightScreen(getApplicationContext());
-					}
-					if (!MyApp.isMainForeground) { // 发送Home键，回到主界面
-						sendKeyCode(KeyEvent.KEYCODE_HOME);
-					}
+					// if (!powerManager.isScreenOn()) { // 点亮屏幕
+					// SettingUtil.lightScreen(getApplicationContext());
+					// }
+					// if (!MyApp.isMainForeground) { // 发送Home键，回到主界面
+					// sendKeyCode(KeyEvent.KEYCODE_HOME);
+					// }
 					new Thread(new StartRecordThread()).start(); // 开始录像
 				}
 			} else {
@@ -2482,7 +2445,7 @@ public class MainActivity extends Activity implements TachographCallback,
 
 	/** 视频SD卡不存在提示 */
 	private void noVideoSDHint() {
-		if (MyApp.isAccOn) {
+		if (MyApp.isAccOn && !ClickUtil.isHintNoSd2TooQuick(5000)) {
 			String strNoSD = getResources().getString(
 					R.string.hint_sd2_not_exist);
 			audioRecordDialog.showErrorDialog(strNoSD);
@@ -2576,13 +2539,15 @@ public class MainActivity extends Activity implements TachographCallback,
 	/** ACC下电拍照 */
 	public void takePhotoWhenAccOff() {
 		if (carRecorder != null) {
+			int isSuccess = carRecorder.takePicture();
+			MyLog.v("[takePhotoWhenAccOff]isSuccess:" + isSuccess);
+			// HintUtil.playAudio(getApplicationContext(), FILE_TYPE_IMAGE);
 			if (!MyApp.isAccOffPhotoTaking) {
 				MyApp.isAccOffPhotoTaking = true;
+
 				if (StorageUtil.isVideoCardExists()) {
 					setDirectory(Constant.Path.SDCARD_2); // 如果录像卡不存在，则会保存到内部存储
 				}
-				HintUtil.playAudio(getApplicationContext(), FILE_TYPE_IMAGE);
-				carRecorder.takePicture();
 
 				if (sharedPreferences.getBoolean(Constant.MySP.STR_PARKING_ON,
 						true) && Constant.Module.hintParkingMonitor) {
@@ -2592,10 +2557,34 @@ public class MainActivity extends Activity implements TachographCallback,
 									R.string.hint_start_park_monitor_after_90));
 				}
 			}
-			if (powerManager.isScreenOn()) {
-				sendKeyCode(KeyEvent.KEYCODE_POWER); // 熄屏
+		} else {
+			MyLog.v("[takePhotoWhenAccOff]carRecorder is null");
+		}
+		new Thread(new CloseScreenThread()).start();
+	}
+
+	public class CloseScreenThread implements Runnable {
+
+		@Override
+		public void run() {
+			try {
+				Thread.sleep(500);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			if (!MyApp.isAccOn && powerManager.isScreenOn()) {
+				// sendKeyCode(KeyEvent.KEYCODE_POWER); // 熄屏
+				Intent intentLockScreen = new Intent();
+				ComponentName componentLockScreen = new ComponentName(
+						"com.tchip.lockscreen",
+						"com.tchip.lockscreen.MainActivity");
+				intentLockScreen.setComponent(componentLockScreen);
+				intentLockScreen.setAction("android.intent.action.VIEW");
+				intentLockScreen.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+				startActivity(intentLockScreen);
 			}
 		}
+
 	}
 
 	/** 语音拍照 */
@@ -2741,12 +2730,6 @@ public class MainActivity extends Activity implements TachographCallback,
 			HintUtil.showToast(MainActivity.this, strSaveVideoErr);
 			MyLog.e("Record Error : ERROR_SAVE_VIDEO_FAIL");
 			// 视频保存失败，原因：存储空间不足，清空文件夹，视频被删掉
-			// FIXME
-			// resetRecordTimeText();
-			// MyLog.v("[onError]stopRecorder()");
-			// if (stopRecorder() == 0) {
-			// setRecordState(false);
-			// }
 			break;
 
 		case TachographCallback.ERROR_SAVE_IMAGE_FAIL:
@@ -2872,6 +2855,7 @@ public class MainActivity extends Activity implements TachographCallback,
 					sendBroadcast(intent);
 
 					MyApp.isAccOffPhotoTaking = false;
+					MyLog.v("SendDSA,Path:" + path);
 				}
 
 				// 通知语音

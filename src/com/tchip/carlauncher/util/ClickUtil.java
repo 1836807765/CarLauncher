@@ -19,6 +19,29 @@ public class ClickUtil {
 		lastClickTime = time;
 		return false;
 	}
+	
+	private static long lastHintNoSd2Time;
+	
+	public static boolean isHintNoSd2TooQuick(int runMinSpan){
+		long time = System.currentTimeMillis();
+		long timeD = time - lastHintNoSd2Time;
+		if (0 < timeD && timeD < runMinSpan) {
+			return true;
+		}
+		lastHintNoSd2Time = time;
+		return false;
+	}
+	
+	private static long lastHintSleepTime;
+	public static boolean isHintSleepTooQuick(int runMinSpan){
+		long time = System.currentTimeMillis();
+		long timeD = time - lastHintSleepTime;
+		if (0 < timeD && timeD < runMinSpan) {
+			return true;
+		}
+		lastHintSleepTime = time;
+		return false;
+	}
 
 	private static long lastUpdate3GSingalTime;
 
