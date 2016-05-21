@@ -419,6 +419,12 @@ public class MainActivity extends Activity implements TachographCallback,
 				new Thread(new PreSleepThread()).start();
 			} else if (Constant.Broadcast.ACC_ON.equals(action)) {
 				MyApp.isAccOn = true;
+				if (!powerManager.isScreenOn()) { // 点亮屏幕
+					SettingUtil.lightScreen(getApplicationContext());
+				}
+				if (!MyApp.isMainForeground) { // 发送Home键，回到主界面
+					sendKeyCode(KeyEvent.KEYCODE_HOME);
+				}
 				MyApp.isAccOffPhotoTaking = false; // 重置ACC下电拍照标志
 				preSleepCount = 0;
 				MyApp.isSleepConfirm = false;
@@ -2568,7 +2574,7 @@ public class MainActivity extends Activity implements TachographCallback,
 		@Override
 		public void run() {
 			try {
-				Thread.sleep(500);
+				Thread.sleep(2000);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
