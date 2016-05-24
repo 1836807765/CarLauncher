@@ -270,7 +270,7 @@ public interface Constant {
 
 	public static final class Module {
 		/** 是否是公版软件 */
-		public static final boolean isPublic = false;
+		public static final boolean isPublic = true;
 
 		/** 双录是否录制到单卡 */
 		public static final boolean isRecordSingleCard = true;
@@ -291,7 +291,7 @@ public interface Constant {
 		public static final boolean hasECarOnline = isPublic;
 
 		/** 是否有网络电台 */
-		public static final boolean hasOnlineFM = false;
+		public static final boolean hasOnlineFM = isPublic;
 
 		/** 是否提示90s后启动停车守卫 */
 		public static final boolean hintParkingMonitor = !isPublic;

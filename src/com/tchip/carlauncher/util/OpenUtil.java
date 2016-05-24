@@ -512,7 +512,8 @@ public class OpenUtil {
 
 					Intent intentWeme = new Intent();
 					ComponentName componentWeme = new ComponentName(
-							"com.mirrtalk.app", "com.mirrtalk.app.MtLoginActivity");
+							"com.mirrtalk.app",
+							"com.mirrtalk.app.MtLoginActivity");
 					intentWeme.setComponent(componentWeme);
 					intentWeme.setAction("android.intent.action.VIEW");
 					intentWeme.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -534,12 +535,12 @@ public class OpenUtil {
 
 				case XIMALAYA:
 					Intent intentXimaLaya = new Intent();
-//					ComponentName componentXimalaya = new ComponentName(
-//							"com.ximalaya.ting.android.car",
-//							"com.ximalaya.ting.android.car.activity.WelcomeActivity");
 					ComponentName componentXimalaya = new ComponentName(
-							"com.txznet.music",
-							"com.txznet.music.ui.MainActivity");
+							"com.ximalaya.ting.android.car",
+							"com.ximalaya.ting.android.car.activity.WelcomeActivity");
+					// ComponentName componentXimalaya = new ComponentName(
+					// "com.txznet.music",
+					// "com.txznet.music.ui.MainActivity");
 					intentXimaLaya.setComponent(componentXimalaya);
 					intentXimaLaya.setAction("android.intent.action.VIEW");
 					intentXimaLaya.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
