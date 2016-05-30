@@ -165,7 +165,7 @@ public interface Constant {
 		public static final boolean parkDefaultOn = true;
 
 		/** 开机自动录像延时 */
-		public static final int autoRecordDelay = 2500;
+		public static final int autoRecordDelay = 2000;
 
 		/** 循环录像保留空间(单位：字节B) */
 		public static final long SD_MIN_FREE_STORAGE = 400 * 1024 * 1024; // 400M
@@ -270,7 +270,7 @@ public interface Constant {
 
 	public static final class Module {
 		/** 是否是公版软件 */
-		public static final boolean isPublic = true;
+		public static final boolean isPublic = false;
 
 		/** 双录是否录制到单卡 */
 		public static final boolean isRecordSingleCard = true;

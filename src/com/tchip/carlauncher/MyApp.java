@@ -52,7 +52,7 @@ public class MyApp extends Application {
 
 	/** ACC拍照后,在onFileSave中传Path给DSA */
 	public static boolean shouldSendPathToDSA = false;
-	
+
 	/** 碰撞将图片传给微信助手 */
 	public static boolean shouldSendPathToWechat = false;
 
@@ -88,7 +88,7 @@ public class MyApp extends Application {
 
 	/** SD卡准备格式化 */
 	public static boolean isVideoCardFormat = false;
-	
+
 	/** 系统准备关机 */
 	public static boolean isGoingShutdown = false;
 
@@ -119,16 +119,8 @@ public class MyApp extends Application {
 
 	public static String writeImageExifPath = "NULL";
 
-	public static enum CameraState {
-		/** 未初始化 */
-		NULL,
-
-		/** 已初始化，预览或录像 */
-		OKAY
-	}
-
-	/** 录像窗口状态 */
-	public static CameraState cameraState = CameraState.OKAY;
+	/** 录像预览窗口是否初始化 */
+	public static boolean isCameraPreview = false;
 
 	public static enum SLEEP_STATE {
 		/** 未休眠：ACC连接 */
