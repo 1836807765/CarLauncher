@@ -1865,7 +1865,7 @@ public class MainActivity extends Activity implements TachographCallback,
 					// 切换分辨率录像停止，需要重置时间
 					MyApp.shouldVideoRecordWhenChangeSize = MyApp.isVideoReording;
 					setRecordState(false); // FIXME
-					
+
 					if (resolutionState == Constant.Record.STATE_RESOLUTION_1080P) {
 						setResolution(Constant.Record.STATE_RESOLUTION_720P);
 						editor.putString("videoSize", "720");
@@ -2413,6 +2413,60 @@ public class MainActivity extends Activity implements TachographCallback,
 			e.printStackTrace();
 		}
 	}
+
+	private void stopParkRecorder() {
+		try {
+			int tryTime = 0;
+			while (stopRecorder() != 0 && tryTime < 5) { // 停止录像
+				tryTime++;
+			}
+			if (MyApp.shouldStopWhenCrashVideoSave) {
+				MyApp.shouldStopWhenCrashVideoSave = false;
+			}
+
+			if (MyApp.isVideoReording) {
+				recordState = Constant.Record.STATE_RECORD_STOPPED;
+				MyApp.isVideoReording = false;
+				textRecordTime.setVisibility(View.INVISIBLE);
+				resetRecordTimeText();
+				// releaseCameraZone(); // FIXME
+				new Thread(new ReleaseParkCameraThread()).start();
+				MyApp.isUpdateTimeThreadRun = false;
+				setupRecordViews();
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	class ReleaseParkCameraThread implements Runnable {
+
+		@Override
+		public void run() {
+			try {
+				Thread.sleep(2500);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			Message msgReleaseParkCamera = new Message();
+			msgReleaseParkCamera.what = 1;
+			releaseParkCameraHandler.sendMessage(msgReleaseParkCamera);
+		}
+
+	}
+
+	Handler releaseParkCameraHandler = new Handler() {
+		public void handleMessage(Message msg) {
+			switch (msg.what) {
+			case 1:
+				releaseCameraZone();
+				break;
+
+			default:
+				break;
+			}
+		}
+	};
 
 	/**
 	 * 停止录像
