@@ -165,7 +165,7 @@ public interface Constant {
 		public static final boolean parkDefaultOn = true;
 
 		/** 开机自动录像延时 */
-		public static final int autoRecordDelay = 2000;
+		public static final int autoRecordDelay = 2500;
 
 		/** 循环录像保留空间(单位：字节B) */
 		public static final long SD_MIN_FREE_STORAGE = 400 * 1024 * 1024; // 400M
@@ -291,7 +291,7 @@ public interface Constant {
 		public static final boolean hasECarOnline = isPublic;
 
 		/** 是否有网络电台 */
-		public static final boolean hasOnlineFM = isPublic;
+		public static final boolean hasOnlineFM = false;// isPublic;
 
 		/** 是否提示90s后启动停车守卫 */
 		public static final boolean hintParkingMonitor = !isPublic;
