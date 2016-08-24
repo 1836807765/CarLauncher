@@ -783,6 +783,7 @@ public class MainActivity extends Activity implements TachographCallback,
 			String[] arrayKillApp = { "cn.kuwo.kwmusiccar", // 酷我音乐
 					"com.android.gallery3d", // 图库
 					"com.autonavi.amapauto", // 高德地图（车机版）
+					"com.autonavi.amapautolite", // 高德地图（车镜版）
 					"com.hdsc.monitor.heart.monitorvoice", // 善领云中心
 					"com.ximalaya.ting.android.car", // 喜马拉雅（车机版）
 					"com.autonavi.minimap" // 高德地图
@@ -1966,7 +1967,7 @@ public class MainActivity extends Activity implements TachographCallback,
 
 			case R.id.imageNavi:
 				OpenUtil.openModule(MainActivity.this,
-						Constant.Module.isPublic ? MODULE_TYPE.NAVI_GAODE_CAR
+						Constant.Module.isPublic ? MODULE_TYPE.NAVI_GAODE_MIRROR
 								: MODULE_TYPE.NAVI_GAODE);
 				break;
 

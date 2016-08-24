@@ -67,6 +67,9 @@ public class OpenUtil {
 		/** 导航:高德地图车机版 */
 		NAVI_GAODE_CAR,
 
+		/** 导航:高德地图车镜版 */
+		NAVI_GAODE_MIRROR,
+
 		/** 导航：图吧 */
 		NAVI_TUBA,
 
@@ -353,7 +356,6 @@ public class OpenUtil {
 					break;
 
 				case NAVI_GAODE_CAR:
-
 					activity.sendBroadcast(new Intent(
 							"tchip.intent.action.ACTION_GPS_ON")); // 打开GPS
 					ComponentName componentGaodeCar;
@@ -364,6 +366,23 @@ public class OpenUtil {
 					intentGaodeCar.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 					intentGaodeCar.setComponent(componentGaodeCar);
 					activity.startActivity(intentGaodeCar);
+					activity.overridePendingTransition(
+							R.anim.zms_translate_up_out,
+							R.anim.zms_translate_up_in);
+					break;
+
+				case NAVI_GAODE_MIRROR:
+					activity.sendBroadcast(new Intent(
+							"tchip.intent.action.ACTION_GPS_ON")); // 打开GPS
+					ComponentName componentGaodeCarMirror;
+					componentGaodeCarMirror = new ComponentName(
+							"com.autonavi.amapautolite",
+							"com.autonavi.auto.remote.fill.UsbFillActivity");
+					Intent intentGaodeCarMirror = new Intent();
+					intentGaodeCarMirror.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+							| Intent.FLAG_ACTIVITY_TASK_ON_HOME);
+					intentGaodeCarMirror.setComponent(componentGaodeCarMirror);
+					activity.startActivity(intentGaodeCarMirror);
 					activity.overridePendingTransition(
 							R.anim.zms_translate_up_out,
 							R.anim.zms_translate_up_in);
