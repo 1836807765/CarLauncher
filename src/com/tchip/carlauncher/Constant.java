@@ -190,6 +190,9 @@ public interface Constant {
 		/** 帧率 */
 		public static final int FRAME_RATE = Module.isPublic ? 24 : 30;
 
+		/** 默认分段 */
+		public static final int DEFAULT_VIDEO_LENGTH = Module.isPublic ? 1 : 3;
+
 		// 分辨率
 		public static final int STATE_RESOLUTION_720P = 0;
 		public static final int STATE_RESOLUTION_1080P = 1;

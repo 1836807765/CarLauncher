@@ -1650,7 +1650,8 @@ public class MainActivity extends Activity implements TachographCallback,
 				if (MyApp.shouldStopWhenCrashVideoSave && MyApp.isVideoReording) {
 					if (secondCount == Constant.Record.parkVideoLength) {
 						String videoTimeStr = sharedPreferences.getString(
-								"videoTime", "3");
+								"videoTime", ""
+										+ Constant.Record.DEFAULT_VIDEO_LENGTH);
 						intervalState = "1".equals(videoTimeStr) ? Constant.Record.STATE_INTERVAL_1MIN
 								: Constant.Record.STATE_INTERVAL_3MIN;
 
@@ -1966,7 +1967,8 @@ public class MainActivity extends Activity implements TachographCallback,
 				break;
 
 			case R.id.imageNavi:
-				OpenUtil.openModule(MainActivity.this,
+				OpenUtil.openModule(
+						MainActivity.this,
 						Constant.Module.isPublic ? MODULE_TYPE.NAVI_GAODE_MIRROR
 								: MODULE_TYPE.NAVI_GAODE);
 				break;
@@ -2143,7 +2145,8 @@ public class MainActivity extends Activity implements TachographCallback,
 		resolutionState = "1080".equals(videoSizeStr) ? Constant.Record.STATE_RESOLUTION_1080P
 				: Constant.Record.STATE_RESOLUTION_720P;
 
-		String videoTimeStr = sharedPreferences.getString("videoTime", "3"); // 视频分段
+		String videoTimeStr = sharedPreferences.getString("videoTime", ""
+				+ Constant.Record.DEFAULT_VIDEO_LENGTH); // 视频分段
 		intervalState = "1".equals(videoTimeStr) ? Constant.Record.STATE_INTERVAL_1MIN
 				: Constant.Record.STATE_INTERVAL_3MIN;
 	}
